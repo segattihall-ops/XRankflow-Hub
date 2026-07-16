@@ -60,5 +60,9 @@ export type BrandRecord = {
   org_id: string
   name: string
   slug: string
+  code?: string
+  color?: string
+  description?: string
+  image?: string
   created_at: string
 }
