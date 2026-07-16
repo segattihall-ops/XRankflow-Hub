@@ -1,53 +1,87 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { FileText, FolderKanban, CheckCircle2, Users, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { Badge } from '@/components/ui/Badge'
-import { mockUsers, mockBrands, mockActivityLog } from '@/data/mockData'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import { mockBrands } from '@/data/mockData'
+import type { TaskRecord, FinanceRecord } from '@/lib/supabase'
 
 const quickAccessItems = [
   {
-    title: 'Hub Navigator',
-    description: 'Browse modules, documents and policies',
-    href: '/hub-navigator',
-    color: 'bg-blue-600',
-  },
-  {
-    title: 'Projects',
-    description: 'Cross-brand operational initiatives',
-    href: '/projects',
-    color: 'bg-purple-600',
-  },
-  {
-    title: 'Finance & KPIs',
-    description: 'Revenue, costs, and unit economics',
+    title: 'Finance Tracker',
+    description: 'Custos, assinaturas e receitas',
     href: '/finance',
     color: 'bg-green-600',
   },
   {
-    title: 'Tasks & Sprints',
-    description: 'Execution inbox across all brands',
+    title: 'Projects & Tasks',
+    description: 'Execução diária e prioridades',
     href: '/tasks',
     color: 'bg-orange-600',
   },
   {
-    title: 'CRM & Pipeline',
-    description: 'Leads, clients, and partner pipeline',
-    href: '/crm',
-    color: 'bg-indigo-600',
+    title: 'KPI Scorecard',
+    description: 'Métricas-chave e saúde dos projetos',
+    href: '/finance',
+    color: 'bg-blue-600',
   },
   {
-    title: 'Team & People',
-    description: 'Cross-brand organization directory',
+    title: 'Team Directory',
+    description: 'Pessoas, roles e delegações',
     href: '/team',
-    color: 'bg-cyan-600',
+    color: 'bg-purple-600',
+  },
+  {
+    title: 'Brands',
+    description: 'Portfólio de marcas e workspaces',
+    href: '/brands',
+    color: 'bg-teal-600',
+  },
+  {
+    title: 'Activity Log',
+    description: 'Histórico de ações e mudanças',
+    href: '/activity',
+    color: 'bg-indigo-600',
   },
 ]
 
 export default function Home() {
+  const { user } = useAuth()
+  const [tasks, setTasks] = useState<TaskRecord[]>([])
+  const [finance, setFinance] = useState<FinanceRecord[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [tasksRes, financeRes] = await Promise.all([
+          supabase.from('wh_tasks').select('*').limit(5),
+          supabase.from('wh_finance').select('*').limit(10),
+        ])
+
+        if (tasksRes.data) setTasks(tasksRes.data)
+        if (financeRes.data) setFinance(financeRes.data)
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const openTasks = tasks.filter(t => t.status !== 'Done').length
+  const totalExpenses = finance
+    .filter(f => f.type === 'Expense' && f.amount)
+    .reduce((sum, f) => sum + (f.amount || 0), 0)
+
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Hero Section */}
@@ -120,26 +154,26 @@ export default function Home() {
       <div className="px-10 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <KPICard
-            label="Documents"
-            value="16"
+            label="Open Tasks"
+            value={openTasks}
             icon={<FileText size={32} />}
             color="purple"
           />
           <KPICard
-            label="Total Projects"
-            value="6"
+            label="Total Finance Items"
+            value={finance.length}
             icon={<FolderKanban size={32} />}
             color="blue"
           />
           <KPICard
-            label="Active Projects"
-            value="5"
+            label="Total Expenses"
+            value={`$${(totalExpenses / 1000).toFixed(1)}k`}
             icon={<CheckCircle2 size={32} />}
             color="green"
           />
           <KPICard
-            label="Team Members"
-            value="8"
+            label="Subscriptions"
+            value={finance.filter(f => f.type === 'Subscription').length}
             icon={<Users size={32} />}
             color="orange"
           />

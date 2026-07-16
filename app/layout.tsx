@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBanner } from '@/components/layout/TopBanner'
+import { AuthProvider } from '@/lib/auth-context'
+import { ProtectedLayout } from '@/components/layout/ProtectedLayout'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -16,13 +18,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-primary-light dark:bg-gray-950">
-        <TopBanner />
-        <div className="flex">
-          <Sidebar />
-          <main className="flex-1 ml-sidebar min-h-screen">
+        <AuthProvider>
+          <ProtectedLayout>
             {children}
-          </main>
-        </div>
+          </ProtectedLayout>
+        </AuthProvider>
       </body>
     </html>
   )
