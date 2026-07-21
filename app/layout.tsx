@@ -1,6 +1,4 @@
 import type { Metadata } from 'next'
-import { Sidebar } from '@/components/layout/Sidebar'
-import { TopBanner } from '@/components/layout/TopBanner'
 import { AuthProvider } from '@/lib/auth-context'
 import { ProtectedLayout } from '@/components/layout/ProtectedLayout'
 import './globals.css'

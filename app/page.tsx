@@ -6,10 +6,8 @@ import { FileText, FolderKanban, CheckCircle2, Users, ArrowRight } from 'lucide-
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
-import { Badge } from '@/components/ui/Badge'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/lib/auth-context'
-import { mockBrands } from '@/data/mockData'
+import { mockBrands, mockActivityLog } from '@/data/mockData'
 import type { TaskRecord, FinanceRecord } from '@/lib/supabase'
 
 const quickAccessItems = [
@@ -52,10 +50,8 @@ const quickAccessItems = [
 ]
 
 export default function Home() {
-  const { user } = useAuth()
   const [tasks, setTasks] = useState<TaskRecord[]>([])
   const [finance, setFinance] = useState<FinanceRecord[]>([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,8 +65,6 @@ export default function Home() {
         if (financeRes.data) setFinance(financeRes.data)
       } catch (error) {
         console.error('Error fetching data:', error)
-      } finally {
-        setLoading(false)
       }
     }
 

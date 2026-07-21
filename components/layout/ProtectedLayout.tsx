@@ -3,11 +3,9 @@
 import { useAuth } from '@/lib/auth-context'
 import { Sidebar } from './Sidebar'
 import { TopBanner } from './TopBanner'
-import { useRouter } from 'next/navigation'
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
-  const router = useRouter()
 
   if (loading) {
     return (

@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { KPICard } from '@/components/ui/KPICard'
 import { mockBrands } from '@/data/mockData'

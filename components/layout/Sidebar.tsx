@@ -11,7 +11,6 @@ import {
   PieChart,
   Users,
   BarChart3,
-  Layers,
   LogOut,
   ShoppingBag,
 } from 'lucide-react'
