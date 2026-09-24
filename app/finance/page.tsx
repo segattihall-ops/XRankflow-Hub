@@ -119,7 +119,7 @@ export default function FinancePage() {
                   Sem registros financeiros
                 </p>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Clique "Novo Registro" para começar
+                  Clique &quot;Novo Registro&quot; para começar
                 </p>
               </div>
             ) : (
