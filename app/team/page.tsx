@@ -37,7 +37,9 @@ export default function TeamPage() {
     p.role?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const getAccessColor = (status: string) => {
+  const getAccessColor = (
+    status: string
+  ): 'success' | 'info' | 'warning' | 'onhold' => {
     if (status === 'Active') return 'success'
     if (status === 'Onboarding') return 'info'
     if (status === 'Hiring') return 'warning'
@@ -118,7 +120,7 @@ export default function TeamPage() {
                 <p className="text-xs uppercase tracking-widest text-gray-500 mb-2 font-semibold">
                   Status
                 </p>
-                <Badge variant={getAccessColor(person.status) as any}>
+                <Badge variant={getAccessColor(person.status)}>
                   {person.status}
                 </Badge>
               </Card>

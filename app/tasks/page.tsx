@@ -111,7 +111,7 @@ export default function TasksPage() {
               No tasks yet
             </p>
             <p className="text-gray-600 dark:text-gray-400">
-              Click "New Task" to create your first task
+              Click &quot;New Task&quot; to create your first task
             </p>
           </Card>
         ) : (

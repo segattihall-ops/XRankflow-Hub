@@ -79,7 +79,7 @@ export default function ProjectsPage() {
               Nenhuma tarefa ainda
             </p>
             <p className="text-gray-600 dark:text-gray-400">
-              Clique em "Nova Tarefa" para começar
+              Clique em &quot;Nova Tarefa&quot; para começar
             </p>
           </Card>
         ) : (

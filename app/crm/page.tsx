@@ -71,7 +71,7 @@ export default function CRMPage() {
             No contacts yet
           </p>
           <p className="text-gray-600 dark:text-gray-400">
-            Click "Add Contact" to start building your pipeline
+            Click &quot;Add Contact&quot; to start building your pipeline
           </p>
         </Card>
       </div>
