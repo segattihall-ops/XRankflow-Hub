@@ -14,6 +14,19 @@ interface ActivityLogEntry {
   created_at: string
 }
 
+interface TaskActivitySource {
+  id: string
+  title: string
+  created_at: string
+  owner_role: string
+}
+
+interface FinanceActivitySource {
+  id: string
+  item: string
+  created_at: string
+}
+
 export default function ActivityPage() {
   const [activities, setActivities] = useState<ActivityLogEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,8 +50,11 @@ export default function ActivityPage() {
             supabase.from('wh_finance').select('id, item, created_at').order('created_at', { ascending: false }).limit(5),
           ])
 
+          const taskRows = (tasks.data ?? []) as TaskActivitySource[]
+          const financeRows = (finance.data ?? []) as FinanceActivitySource[]
+
           const combined = [
-            ...(tasks.data?.map((t: any) => ({
+            ...taskRows.map((t) => ({
               id: t.id,
               user_name: t.owner_role,
               user_avatar: t.owner_role.substring(0, 1),
@@ -46,8 +62,8 @@ export default function ActivityPage() {
               resource: t.title,
               resource_type: 'Task',
               created_at: t.created_at,
-            })) || []),
-            ...(finance.data?.map((f: any) => ({
+            })),
+            ...financeRows.map((f) => ({
               id: f.id,
               user_name: 'Finance',
               user_avatar: 'F',
@@ -55,7 +71,7 @@ export default function ActivityPage() {
               resource: f.item,
               resource_type: 'Finance',
               created_at: f.created_at,
-            })) || []),
+            })),
           ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
           setActivities(combined)
