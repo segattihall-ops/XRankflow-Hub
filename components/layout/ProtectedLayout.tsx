@@ -1,13 +1,16 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
+import { usePathname } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { TopBanner } from './TopBanner'
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const pathname = usePathname()
+  const isLoginPage = pathname === '/login'
 
-  if (loading) {
+  if (loading && !isLoginPage) {
     return (
       <div className="min-h-screen bg-primary-light dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
@@ -16,6 +19,10 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     )
+  }
+
+  if (!user && isLoginPage) {
+    return children
   }
 
   if (!user) {

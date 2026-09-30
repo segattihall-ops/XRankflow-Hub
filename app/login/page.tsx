@@ -6,8 +6,19 @@ import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('saved_email') || ''
+    }
+    return ''
+  })
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('remember_me') === 'true'
+    }
+    return false
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -16,17 +27,30 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else {
+        if (rememberMe) {
+          localStorage.setItem('saved_email', email)
+          localStorage.setItem('remember_me', 'true')
+        } else {
+          localStorage.removeItem('saved_email')
+          localStorage.removeItem('remember_me')
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+        router.refresh()
+        router.push('/')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during login')
       setLoading(false)
-    } else {
-      router.push('/')
-      router.refresh()
     }
   }
 
@@ -84,6 +108,19 @@ export default function LoginPage() {
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 required
               />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-600"
+              />
+              <label htmlFor="remember" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Lembrar-se de mim
+              </label>
             </div>
 
             <button
