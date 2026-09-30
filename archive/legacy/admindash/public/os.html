@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operation System — XRANKFLOW</title>
+<style>
+:root{color-scheme:light;--bg:#f6f7fb;--card:#fff;--ink:#0f1222;--muted:#6b7180;--line:#e7e9f0;--accent:#4f46e5;--red:#e23b4e;--amber:#e6a100;--green:#1aa463;--blue:#2563eb;--purple:#7c3aed;--shadow:0 1px 2px rgba(16,18,34,.04),0 8px 24px rgba(16,18,34,.06)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 18px 60px}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.hd h1{font-size:19px;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.hd .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.ico{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:11px;background:linear-gradient(145deg,#fff,#eef0fb);box-shadow:var(--shadow);font-size:19px;transform:perspective(600px) rotateX(12deg) rotateY(-12deg)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);padding:8px 0 12px;z-index:5;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;font:inherit;font-weight:650;font-size:13px;color:var(--muted);cursor:pointer;transition:.15s}
+.tab:hover{border-color:#d3d6e6}.tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.page{display:none}.page.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow);transition:transform .25s,box-shadow .25s}
+.card:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(16,18,34,.06),0 16px 40px rgba(16,18,34,.10)}
+.kpi{font-size:28px;font-weight:700;letter-spacing:-.03em;margin:8px 0 2px}.kpi small{font-size:13px;font-weight:600;color:var(--muted)}
+.label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.section{margin-top:24px}.section h2{font-size:14px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;display:flex;justify-content:space-between;align-items:center}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:var(--shadow)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+textarea,input[type=url],input[type=text]{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 13px;font:inherit;background:#fcfcff}
+textarea:focus,input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+textarea{resize:vertical;min-height:50px}
+.btn{border:0;border-radius:11px;padding:10px 15px;font:inherit;font-weight:650;cursor:pointer;transition:.15s}
+.btn.primary{background:var(--accent);color:#fff}.btn.primary:hover{background:#4338ca}
+.btn.ghost{background:#f1f2f8;color:var(--ink)}.btn.ghost:hover{background:#e7e9f4}
+.btn.ok{background:var(--green);color:#fff}.btn.bad{background:#f3f4f8;color:var(--muted)}
+.btn.sm{padding:5px 11px;font-size:12px;border-radius:9px}
+.btn:disabled{opacity:.5;cursor:default}
+.analysis{margin-top:14px;border:1px dashed var(--line);border-radius:14px;padding:14px;background:#fbfbff;display:none}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px}
+.t-high{background:#fdecee;color:var(--red)}.t-med{background:#fdf4e0;color:#9a6b00}.t-low{background:#eef1f6;color:#5b6273}
+.t-auto{background:#e7f6ee;color:var(--green)}.t-man{background:#eef1f6;color:#5b6273}.t-area{background:#eef0ff;color:var(--accent)}
+.promptbox{background:#0f1222;color:#e8e8f4;border-radius:10px;padding:10px 12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;white-space:pre-wrap;margin-top:8px;max-height:150px;overflow:auto}
+.tasklist{display:flex;flex-direction:column;gap:8px}
+.task{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer}
+.task:hover{border-color:#d8dbe8}.dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.dot.high{background:var(--red)}.dot.medium{background:var(--amber)}.dot.low{background:#9aa1b0}
+.task .ttl{flex:1;font-weight:600;font-size:14px}.task.done .ttl{text-decoration:line-through;color:var(--muted)}
+.task .meta{font-size:12px;color:var(--muted)}
+.mini{font-size:13px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.frow{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink)}
+.frow:hover{border-color:var(--accent);background:#fafaff}.frow b{color:var(--red)}
+.folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.chip{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;text-decoration:none;color:var(--ink);font-size:13px;font-weight:600;transition:.15s}
+.chip:hover{border-color:var(--accent);background:#fafaff;transform:translateY(-1px)}.chip .e{font-size:16px}
+.mapgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.mapcol h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.mapcol a{display:block;padding:7px 10px;border-radius:8px;text-decoration:none;color:var(--ink);font-size:13px}.mapcol a:hover{background:#f3f4fb;color:var(--accent)}
+.empty{color:var(--muted);font-size:13px;padding:6px 2px}
+.taskc{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:8px;overflow:hidden}
+.taskc.done{opacity:.55}
+.taskhd{display:flex;align-items:center;gap:10px;padding:11px 12px}
+.taskhd .ttl{flex:1;font-weight:600;font-size:14px;cursor:pointer}
+.taskc.done .taskhd .ttl{text-decoration:line-through;color:var(--muted)}
+.taskhd .meta{font-size:12px;color:var(--muted)}
+.own{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.own.ia{background:#eef0ff;color:var(--accent)}.own.vc{background:#fdf4e0;color:#9a6b00}
+.taskbody{border-top:1px solid var(--line);padding:12px;background:#fbfbff}
+.tdetails{font-size:13px;color:var(--ink);margin-bottom:8px}
+.thread{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.bubble{font-size:13px;padding:7px 10px;border-radius:10px;max-width:92%}
+.bubble.u{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+.bubble.a{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:3px;white-space:pre-wrap}
+.trow{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 14px;border-radius:10px;font-size:13px;box-shadow:var(--shadow);opacity:0;transition:.2s;z-index:50;pointer-events:none}
+.toast.show{opacity:1}
+.cmdk,.help{position:fixed;inset:0;background:rgba(15,18,34,.38);justify-content:center;z-index:100}
+.cmdk:not([hidden]),.help:not([hidden]){display:flex}
+.cmdk[hidden],.help[hidden]{display:none}
+.cmdk{align-items:flex-start;padding-top:12vh}.help{align-items:center}
+.cmdk-box{width:92%;max-width:560px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(16,18,34,.28);overflow:hidden}
+#cmdkInput{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:14px 16px;font-size:15px}
+#cmdkInput:focus{box-shadow:none}
+.cmdk-list{max-height:52vh;overflow:auto}
+.cmdk-item{display:flex;gap:10px;align-items:center;padding:10px 16px;font-size:14px;cursor:pointer}
+.cmdk-item .k{font-size:11px;color:var(--muted);margin-left:auto;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-family:ui-monospace,Menlo,monospace}
+.cmdk-item.sel{background:#f3f3fe}
+.cmdk-foot{padding:8px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.help-box{width:90%;max-width:440px;background:#fff;border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+.help-box h3{margin:0 0 12px}
+.help-grid{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13px;align-items:center}
+.help-grid .kk{font-weight:700;font-family:ui-monospace,Menlo,monospace;color:var(--accent);white-space:nowrap}
+.health{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.htile{border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px 14px;box-shadow:var(--shadow);transition:transform .2s}
+.htile:hover{transform:translateY(-2px)}
+.htop{display:flex;align-items:center;gap:8px}
+.hname{font-weight:700;font-size:13px}
+.hdot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:#9aa1b0;box-shadow:0 0 0 3px rgba(0,0,0,.03)}
+.hdot.green{background:var(--green)}.hdot.amber{background:var(--amber)}.hdot.red{background:var(--red)}.hdot.gray{background:#9aa1b0}
+.hstat{font-size:15px;font-weight:700;margin:7px 0 2px;letter-spacing:-.01em}
+.hsub{font-size:11px;color:var(--muted)}
+.pfopts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pfopt{border:1.5px solid var(--line);border-radius:11px;padding:9px 11px;cursor:pointer;font-size:12.5px;font-weight:600;background:#fff;transition:.15s}
+.pfopt:hover{border-color:var(--accent)}.pfopt.sel{border-color:var(--accent);background:#eef0ff;box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.resx{margin-top:14px;border:1.5px solid #d6e2ff;background:#f3f6ff;border-radius:14px;padding:16px;display:none}
+.resx.show{display:block}
+.btn.orange{background:linear-gradient(135deg,#fb923c,#f97316);color:#fff}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #d7d9e6;border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.radar{display:flex;flex-direction:column;gap:8px}
+.ritem{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--line);border-radius:12px}
+.ritem .sev{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;flex:0 0 auto;margin-top:1px}
+.sev.high{background:#fdecee;color:var(--red)}.sev.med{background:#fdf4e0;color:#9a6b00}.sev.low{background:#eef1f6;color:#5b6273}
+.ritem .rtxt{flex:1;font-size:13.5px}.ritem .rtxt b{display:block}
+.adv{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;align-items:center}
+.lv{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.lv.ERROR{background:#fdecee;color:var(--red)}.lv.WARN{background:#fdf4e0;color:#9a6b00}.lv.INFO{background:#eef1f6;color:#5b6273}
+.dep{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;align-items:center}
+.st{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+.st.READY{background:#e7f6ee;color:var(--green)}.st.ERROR{background:#fdecee;color:var(--red)}.st.BUILDING{background:#fdf4e0;color:#9a6b00}
+.st.ideia{background:#eef1f6;color:#5b6273}.st.agendado{background:#fdf4e0;color:#9a6b00}.st.publicado{background:#e7f6ee;color:var(--green)}
+.app{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.app .ad{font-size:12px;color:var(--muted)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .dow{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding:4px 0}
+.cell{min-height:62px;border:1px solid var(--line);border-radius:9px;padding:5px 6px;font-size:11px}
+.cell .n{font-weight:700;color:var(--muted)}
+.cell.has{background:#fafaff}
+.pill{display:block;margin-top:3px;padding:2px 5px;border-radius:5px;color:#fff;font-size:10px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-conversion{background:var(--red)}.p-education{background:var(--blue)}.p-authority{background:var(--purple)}.p-proof{background:var(--green)}
+.wiki h3{font-size:15px;margin:18px 0 6px}.wiki p{font-size:14px;margin:6px 0}.wiki ul{margin:6px 0;padding-left:20px;font-size:14px}
+.wiki .navw{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.banner{border-left:4px solid var(--accent);background:#f3f3fe;border-radius:10px;padding:11px 13px;font-size:13px;margin-bottom:12px}
+.alert{border-left:4px solid var(--red);background:#fdf3f4;border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:13.5px}
+.alert.warn{border-color:var(--amber);background:#fdf8ec}.alert.ok{border-color:var(--green);background:#eefaf3}.alert b{display:block;margin-bottom:2px}
+.foot{margin-top:26px;color:var(--muted);font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}.foot a{color:var(--accent);text-decoration:none;font-weight:600}
+</style>
+</head>
+<body>
+<script>
+function __tok(){var m=document.cookie.match(/(?:^|; )auth_token=([^;]+)/);return m?decodeURIComponent(m[1]):"";}
+window.cowork={
+ callMcpTool:async(name,args)=>{const r=await fetch('/api/mcp',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+__tok()},body:JSON.stringify({tool:name,args:args||{}})});if(!r.ok)throw new Error('mcp '+r.status);return await r.json();},
+ askClaude:async(prompt)=>{try{const r=await fetch('/api/ai',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+__tok()},body:JSON.stringify({prompt})});const j=await r.json();return j.text||'';}catch(e){return '';}}
+};
+</script>
+<div class="wrap">
+  <div class="hd">
+    <div><h1><span class="ico">🤖</span> Operation System — XRANKFLOW</h1>
+      <div class="sub" id="greeting">Carregando…</div></div>
+    <button class="btn ghost sm" id="cmdkBtn" title="Command palette (Ctrl/Cmd+K)">⌘K Comandos</button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="hoje">🏠 Hoje</button>
+    <button class="tab" data-tab="fin">💰 Finanças</button>
+    <button class="tab" data-tab="dev">🛠️ DevOps</button>
+    <button class="tab" data-tab="apps">🚀 Apps</button>
+    <button class="tab" data-tab="planos">💼 Planos</button>
+    <button class="tab" data-tab="cal">🗓️ Calendário</button>
+    <button class="tab" data-tab="wiki">📚 Wiki</button>
+    <button class="tab" data-tab="midia">🖼️ Mídia</button>
+    <button class="tab" data-tab="mapa">🧭 Mapa</button>
+  </div>
+
+  <!-- HOJE -->
+  <div class="page active" id="page-hoje">
+    <div class="section" style="margin-top:2px"><h2>🩺 Health Board <span class="mini" style="text-transform:none;letter-spacing:0">ao vivo</span></h2>
+      <div class="health" id="healthBoard">
+        <div class="htile" id="h-vox"><div class="htop"><span class="hdot gray"></span><span class="hname">🎯 Voxmation</span></div><div class="hstat"><span class="spin"></span></div><div class="hsub">site + leads</div></div>
+        <div class="htile" id="h-mm"><div class="htop"><span class="hdot gray"></span><span class="hname">💆 MasseurMatch</span></div><div class="hstat"><span class="spin"></span></div><div class="hsub">site + segurança</div></div>
+        <div class="htile" id="h-trf"><div class="htop"><span class="hdot amber"></span><span class="hname">📊 TheRankFlow</span></div><div class="hstat">Pausado</div><div class="hsub">reativar p/ clientes Vox</div></div>
+        <div class="htile" id="h-desp"><div class="htop"><span class="hdot red"></span><span class="hname">🛂 DespachanteUSA</span></div><div class="hstat">Sem setup</div><div class="hsub">falta escopo</div></div>
+        <div class="htile" id="h-sec"><div class="htop"><span class="hdot gray"></span><span class="hname">🛡️ Segurança</span></div><div class="hstat"><span class="spin"></span></div><div class="hsub">Supabase</div></div>
+        <div class="htile" id="h-cash"><div class="htop"><span class="hdot gray"></span><span class="hname">💸 Caixa</span></div><div class="hstat"><span class="spin"></span></div><div class="hsub">contas a vencer</div></div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="label">📇 Leads (Zoho)</div><div class="kpi" id="leadsKpi"><span class="spin"></span></div><div class="mini">Pipeline Voxmation</div></div>
+      <div class="card"><div class="label">💸 A vencer</div><div class="kpi" id="billsKpi"><span class="spin"></span></div><div class="mini">Gmail · 21 dias</div></div>
+      <div class="card"><div class="label">🛠️ Alertas DevOps</div><div class="kpi" id="devKpi">—</div><div class="mini">Supabase + Vercel</div></div>
+      <div class="card"><div class="label">✅ Tarefas abertas</div><div class="kpi" id="openKpi">0</div><div class="mini">no OS</div></div>
+    </div>
+
+    <div class="section"><h2>📡 Radar — pendências que pedem ação</h2>
+      <div class="panel"><div class="banner">Itens curados a partir do que o OS encontrou nos seus sistemas. Clique <b>+ Tarefa</b> para mandar pra sua lista.</div>
+        <div class="radar" id="radar"></div>
+      </div>
+    </div>
+
+    <div class="section"><h2>🧠 AI Task Manager</h2>
+      <div class="panel">
+        <textarea id="taskInput" placeholder="Digite uma tarefa… ex: Cancelar trial do Replit antes de virar cobrança"></textarea>
+        <div class="row" style="margin-top:10px"><button class="btn primary" id="analyzeBtn">Analisar com IA</button>
+          <input id="quickAdd" type="text" placeholder="…ou adicione rápido e dê Enter" style="flex:1;min-width:180px"></div>
+        <div class="analysis" id="analysisBox">
+          <div class="label">Análise</div><div class="tags" id="analysisTags"></div>
+          <div class="mini" id="analysisTaskText"></div><div class="promptbox" id="analysisPrompt"></div>
+          <div class="row" style="margin-top:12px"><button class="btn ok" id="approveBtn">✓ Adicionar tarefa</button>
+            <button class="btn bad" id="discardBtn">✗ Descartar</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section"><h2>📋 Tarefas — por prioridade</h2>
+      <div class="panel"><div class="tasklist" id="taskList"></div>
+        <div class="row" style="margin-top:12px;justify-content:space-between"><span class="mini">Clique numa tarefa para concluir.</span>
+          <button class="btn ghost" id="clearDone">Limpar concluídas</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINANÇAS -->
+  <div class="page" id="page-fin">
+    <div class="section" style="margin-top:4px"><h2>🎯 Prioridades financeiras</h2>
+      <div class="panel">
+        <div class="alert"><b>🔴 1. Forma de pagamento falhando</b>Replit, Google Workspace, Amazon, Remitly e Cash App recusaram cobrança recentemente. Resolver isto é a prioridade nº 1 — derruba serviços em cascata.</div>
+        <div class="alert"><b>🔴 2. Seguro do carro CANCELADO (Root, 12/mai)</b>Possível direção sem seguro. Religar com urgência.</div>
+        <div class="alert warn"><b>🟠 3. Google Workspace cancelado (3/mai)</b>Confirmar se admin@xrankflow.com segue ativo.</div>
+        <div class="alert warn"><b>🟠 4. Dívidas próximas</b>Klarna em cobrança ($44,84) · Cash App Borrow $51,12 (12/jun).</div>
+        <div class="alert ok"><b>🟢 5. Cortar assinaturas</b>Facetune $77,99/ano · ProCamera $29,99/ano · Halide · Grindr $44,99/mês · Tesla $10,81/mês · Olitt · TextNow · Linktree.</div>
+      </div>
+    </div>
+    <div class="section"><h2>💸 A vencer / atrasado (ao vivo)</h2><div class="panel"><div class="list" id="finDue"><div class="empty"><span class="spin"></span> Lendo o Gmail…</div></div></div></div>
+    <div class="section"><h2>🧪 Trials (ao vivo)</h2><div class="panel"><div class="list" id="finTrial"><div class="empty">—</div></div></div></div>
+    <div class="section"><h2>🔁 Assinaturas / renovações (ao vivo)</h2><div class="panel"><div class="list" id="finSub"><div class="empty">—</div></div></div></div>
+    <div class="section"><h2>🚫 Cancelamentos (ao vivo)</h2><div class="panel"><div class="list" id="finCancel"><div class="empty">—</div></div></div></div>
+    <div class="section"><h2>💳 Ledger de Gastos (ao vivo · 45 dias)</h2><div class="panel"><div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="mini">Total detectado: <b id="ledgerTotal">—</b></span><span class="mini">integrado aqui, sem planilha</span></div><div class="list" id="ledgerList"><div class="empty"><span class="spin"></span> Lendo o Gmail…</div></div></div></div>
+    <div class="section"><h2>♻️ Recorrentes / assinaturas-zumbi</h2><div class="panel"><div class="list" id="ledgerRecur"><div class="empty">—</div></div></div></div>
+  </div>
+
+  <!-- DEVOPS -->
+  <div class="page" id="page-dev">
+    <div class="section" style="margin-top:4px"><h2>🛡️ Supabase — alertas de segurança (ao vivo)</h2>
+      <div class="panel"><div class="banner">Para eu <b>corrigir</b> de fato, peça no chat: “Claude, corrige os erros de segurança do Supabase” — eu aplico as migrations (com sua aprovação).</div>
+        <div id="supaList"><div class="empty"><span class="spin"></span> Lendo o Supabase…</div></div>
+      </div>
+    </div>
+    <div class="section"><h2>🚀 Vercel — status dos deploys (ao vivo)</h2>
+      <div class="panel"><div class="list" id="vercelList"><div class="empty"><span class="spin"></span> Lendo o Vercel…</div></div>
+        <div class="mini" style="margin-top:8px">⚠️ Há <b>14 projetos</b> no Vercel (vários duplicados de MasseurMatch). Vale consolidar/arquivar.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPS -->
+  <div class="page" id="page-apps">
+    <div class="section" style="margin-top:4px"><h2>🚀 Apps & Projetos</h2>
+      <div class="panel">
+        <div class="row"><input id="appUrl" type="url" placeholder="Cole o link de um app/projeto…" style="flex:1;min-width:200px">
+          <button class="btn primary" id="appAdd">+ Adicionar</button></div>
+        <div class="mini" id="appMsg" style="margin-top:6px">A IA gera uma descrição curta a partir do link.</div>
+        <div id="appList" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALENDÁRIO -->
+  <div class="page" id="page-cal">
+    <div class="section" style="margin-top:4px"><h2>🗓️ Calendário de Posts — Voxmation · Junho 2026</h2>
+      <div class="panel">
+        <div class="row" style="margin-bottom:10px;gap:14px">
+          <span class="mini"><span class="pill p-conversion" style="display:inline-block;padding:2px 8px">conversion</span></span>
+          <span class="mini"><span class="pill p-education" style="display:inline-block;padding:2px 8px">education</span></span>
+          <span class="mini"><span class="pill p-authority" style="display:inline-block;padding:2px 8px">authority</span></span>
+          <span class="mini"><span class="pill p-proof" style="display:inline-block;padding:2px 8px">proof</span></span>
+        </div>
+        <div class="cal" id="calGrid"></div>
+        <div class="list" id="calList" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIKI -->
+  <div class="page" id="page-wiki"><div class="section" style="margin-top:4px"><h2>📚 Wiki XRANKFLOW</h2><div class="panel wiki" id="wikiPanel"></div></div></div>
+
+  <!-- MÍDIA -->
+  <div class="page" id="page-midia"><div class="section" style="margin-top:4px"><h2>🖼️ Mídia & Assets</h2>
+    <div class="panel"><div class="label" style="margin-bottom:8px">Pastas de mídia</div><div class="folders" id="mediaFolders"></div>
+      <div class="label" style="margin:18px 0 8px">Imagens recentes no Drive (ao vivo)</div>
+      <div class="list" id="mediaList"><div class="empty"><span class="spin"></span> Lendo o Drive…</div></div>
+      <div class="mini" style="margin-top:8px">Miniaturas não abrem aqui dentro — clique para ver no Drive.</div></div></div></div>
+
+  <!-- MAPA -->
+  <div class="page" id="page-mapa">
+    <div class="section" style="margin-top:4px"><h2>🗂️ Google Drive</h2>
+      <div class="panel"><div class="label" style="margin-bottom:8px">Pastas principais</div><div class="folders" id="driveFolders"></div>
+        <div class="label" style="margin:18px 0 8px">Arquivos recentes (ao vivo)</div><div class="list" id="driveRecent"><div class="empty"><span class="spin"></span> Lendo o Drive…</div></div></div></div>
+    <div class="section"><h2>🧭 Notion (legado — só arquivo)</h2><div class="panel"><div id="notionMap"></div>
+      <div class="mini" style="margin-top:12px">O OS agora é autossuficiente. O Notion fica só como arquivo histórico.</div></div></div>
+  </div>
+
+  <div class="page" id="page-planos">
+    <div class="section" style="margin-top:2px"><h2>💼 Planos & Plan Finder — Voxmation</h2>
+      <div id="planosWrap"><div class="empty">Carregando…</div></div>
+    </div>
+  </div>
+
+  <div class="foot"><span>Ao vivo: Zoho · Gmail · Supabase · Vercel · Drive · IA: Claude · Briefings 07h/18h · ⌘K comandos</span></div>
+
+  <div class="cmdk" id="cmdk" hidden><div class="cmdk-box">
+    <input id="cmdkInput" type="text" placeholder="Digite um comando ou tarefa…  (Esc fecha)" autocomplete="off">
+    <div class="cmdk-list" id="cmdkList"></div>
+    <div class="cmdk-foot" style="display:flex;justify-content:space-between;align-items:center"><span>↑ ↓ navegar · ↵ executar · Esc/clique fora fecha</span><button class="btn ghost sm" id="cmdkClose">Fechar ✕</button></div>
+  </div></div>
+  <div class="help" id="help" hidden><div class="help-box">
+    <h3>⌨️ Atalhos</h3><div class="help-grid" id="helpGrid"></div>
+    <button class="btn ghost sm" id="helpClose" style="margin-top:12px">Fechar (Esc)</button>
+  </div></div>
+</div>
+
+<script>
+const ZOHO_GET="mcp__4bc40cdc-017f-4eb4-b504-2bee4aed439e__getRecords";
+const GMAIL="mcp__13981a48-7240-4eef-8da6-45922a93ba3d__search_threads";
+const DRIVE_RECENT="mcp__e572b265-e8b7-4d81-9a40-c87cd768d870__list_recent_files";
+const DRIVE_SEARCH="mcp__e572b265-e8b7-4d81-9a40-c87cd768d870__search_files";
+const SUPA_ADV="mcp__62546f64-76f6-4716-9428-8891166a51a0__get_advisors";
+const VERCEL_DEP="mcp__f96443c2-f18b-4594-8973-0a9afb2bd095__list_deployments";
+const VTEAM="team_srSjjkFDYeFA6HpxgpvxPgox";
+const SUPA=[{n:"MasseurMatch",id:"ijsdpozjfjjufjsoexod"},{n:"Voxmation (VOX)",id:"njwqeulzythluenexdcw"}];
+const VPROJ=[{n:"voxmation",id:"prj_VA7pzMeW5HTgfMuzX7xpe1PuC1OO"},{n:"masseurmatch",id:"prj_PabXYt6xxoH3t96KDx2aGu9CYH9t"},{n:"xrankflow-main",id:"prj_yKonZvg80wdaYYvEIpgVCVw9s4eE"},{n:"therankflow",id:"prj_bXpWiCQeiPaUfBxLGndNniOcwFIj"}];
+const DRIVE_FOLDERS=[{n:"00 · Inbox",id:"1QQavGkh9DchjfoyjybXatLJJDcsJw46y"},{n:"01 · XRMG Core",id:"1h9sSwFUbPgLzlc7xajNwALQ6On_YhEFY"},{n:"02 · Businesses",id:"1SRxmUY8NYq0sdGwZ1Mm43tlMDAmKZP86"},{n:"04 · Finance",id:"1oSc4VK6gj5f4xaMJhabFUqrvL9I0laTM"},{n:"05 · Legal",id:"1mYMdMujFbHOiR98_ZPPnpKPjtc5vfT0J"},{n:"06 · Marketing",id:"1k8oUJiQRh6FsWOirr-15SznZVykJ3NBP"},{n:"07 · Sales",id:"1aUxjxu5oAKCq1kU0C-AVPvwc9ZqngRdV"},{n:"08 · Clients",id:"1D7fKTcN-DHbwTChJgPKXufLAubfoTw7-"},{n:"09 · Assets",id:"1hSiPNlOeJkYNqLCjEhcDCDs-QL6bY6N2"},{n:"10 · Automations",id:"1BJ40Li-x4pRv1akI34ojzSLowYXHzIIp"},{n:"11 · Archive",id:"1NgUeZXlyuTFypKs7YQTUTFwFY91XnprI"},{n:"99 · Personal",id:"1f178h_yCjde_w2e3I_M4JxTl_l4k6qyy"}];
+const MEDIA_FOLDERS=[{n:"09 · Assets",id:"1hSiPNlOeJkYNqLCjEhcDCDs-QL6bY6N2"},{n:"VOX Images",id:"1nAB4mPm_DvwXidTYQvatKIIKvBadxHOw"},{n:"Brand Identity v2",id:"1qbFYtVr9QYluaHoDbCr5NQEDMDJXA5TQ"},{n:"IG Content Pack",id:"1tbmdfMWlFGi6nupwVgGz4dEGd_J7HVzL"},{n:"Icons Pack",id:"1WH5Zbv-QYtqTeLm1oU0kgGQGVqEGO3yJ"}];
+const NP="https://app.notion.com/p/";
+const NOTION_MAP={Centrais:[{n:"🏢 XRANKFLOW HQ",u:NP+"37a09af8b0a281bc95d9c4e6d678d7b5"},{n:"🧠 Cérebro | OS",u:NP+"37a09af8b0a281459847d212d6f76ccd"}],Marcas:[{n:"🎯 Voxmation HQ",u:NP+"35609af8b0a281978615da5a90365761"},{n:"💆 MasseurMatch",u:NP+"d7d147e2fab74e4d9b5948e877b9a3d6"},{n:"📊 TheRankFlow",u:NP+"36f09af8b0a2812ab290df7907940717"}]};
+const CHATGPT_EXPORTS="https://drive.google.com/drive/folders/1wIFqiI-T0vH29AQeWWMQZMLI3PcKs6Nj";
+const LS_KEY="os_tasks_v2", LS_APPS="os_apps_v1";
+const SEED_TASKS=[
+ {task:"Resolver forma de pagamento (cartão falhando)",priority:"high",area:"Finanças",owner:"Você",details:"Replit, Google Workspace, Amazon, Remitly e Cash App recusaram cobrança. Atualizar método principal ou garantir saldo. É a raiz das falhas em cascata."},
+ {task:"Religar seguro do carro (Root cancelado 12/mai)",priority:"high",area:"Pessoal",owner:"Você",details:"Apólice Root cancelada. Reativar no app ou cotar (Geico/Progressive). Risco de dirigir sem seguro."},
+ {task:"Cash App Borrow $51,12 vence 12/jun",priority:"high",area:"Finanças",owner:"Você",details:"3 parcelas (35,37 + 5,25 + 10,50). Garantir saldo no Cash/cartão vinculado."},
+ {task:"Definir assinatura dos e-mails Voxmation",priority:"medium",area:"Voxmation",owner:"Você",details:"Os 415 e-mails terminam sem nome. Definir nome + título + telefone + link de agenda. Depois a IA aplica em todos."},
+ {task:"DespachanteUSA: definir escopo, serviços e preços",priority:"medium",area:"DespachanteUSA",owner:"Você",details:"ITIN? tradução juramentada? apostila? CNH? LLC? Preços e canais de captação. Bloqueia a modelagem da empresa."},
+ {task:"Hardening restante do Supabase (RLS + search_path)",priority:"high",area:"XRANKFLOW",owner:"IA",details:"Anon já revogado por mim. Falta: políticas RLS nas tabelas internas + search_path nas funções. Auth (leaked password/MFA) são toggles no painel."},
+ {task:"Corrigir preço errado na home do MasseurMatch",priority:"high",area:"MasseurMatch",owner:"IA",details:"Home mostra Free/Verified $49/Pro $99; correto: Free/Standard $39/Pro $79/Elite $99. Precisa de sessão de código no repo."},
+ {task:"Aplicar assinatura + link de agenda nos 415 e-mails",priority:"medium",area:"Voxmation",owner:"IA",details:"Depois que você definir a assinatura (tarefa acima)."},
+ {task:"Encher calendário de posts (30 dias) do Content OS",priority:"medium",area:"Voxmation",owner:"IA",details:"Gerar 30 dias de posts a partir do Content OS + 100 keywords, prontos pra agendar."},
+ {task:"Listar projetos Vercel mortos para arquivar",priority:"low",area:"XRANKFLOW",owner:"IA",details:"14 projetos, vários duplicados de MasseurMatch. Identificar os seguros pra arquivar."},
+ {task:"Montar Zap de auto-resposta de leads",priority:"medium",area:"Voxmation",owner:"IA",details:"Depende de saber em qual inbox caem as respostas dos leads (sales@/admin@voxmation.com no Gmail/Workspace?)."}
+];
+
+const RADAR=[
+ {sev:"high",area:"Voxmation",b:"Supabase VOX: tabela leads_master exposta publicamente",t:"Visível via GraphQL ao papel anon — seus leads podem ser lidos sem login. Revogar SELECT do anon."},
+ {sev:"high",area:"MasseurMatch",b:"Supabase MM: view com SECURITY DEFINER (ERROR)",t:"public_therapist_profiles roda com permissões do criador, furando RLS. Corrigir para SECURITY INVOKER."},
+ {sev:"high",area:"MasseurMatch",b:"Site MM: preços errados na home",t:"Home mostra Free/Verified $49/Pro $99; canônico é Standard $39/Pro $79/Elite $99. Corrigir antes de divulgar."},
+ {sev:"high",area:"Voxmation",b:"Ligar o worker do Lead Engine (Render 24/7)",t:"Falta adicionar cartão no Render + env vars. Sem isso o motor de leads não roda sozinho."},
+ {sev:"high",area:"Finanças",b:"Resolver forma de pagamento + seguro Root",t:"Cobranças recusadas em cascata; seguro do carro cancelado. Itens financeiros mais urgentes."},
+ {sev:"med",area:"XRANKFLOW",b:"Vercel: 14 projetos (consolidar)",t:"Vários duplicados de MasseurMatch (newmm, new-mm, masseurmatch-3l, v0-…). Arquivar os mortos."},
+ {sev:"med",area:"Voxmation",b:"Assinatura/sender name nos 415 e-mails",t:"E-mails de cadência terminam sem nome. Definir assinatura e aplicar."}
+];
+
+const POSTS=[
+ {day:10,ch:"IG Reel",t:"“Quantos clientes você perde quando ninguém atende?”",st:"agendado",p:"conversion"},
+ {day:11,ch:"LinkedIn",t:"Case: HVAC de Dallas recupera ligações com IA de voz",st:"ideia",p:"authority"},
+ {day:12,ch:"IG Carrossel",t:"Como funciona o agente de voz em 4 passos",st:"ideia",p:"education"},
+ {day:13,ch:"IG Story",t:"Bastidores: demo ao vivo atendendo um encanador",st:"ideia",p:"proof"},
+ {day:16,ch:"LinkedIn",t:"ROI: cada chamada perdida = $X. Faça a conta",st:"ideia",p:"conversion"},
+ {day:17,ch:"IG Reel",t:"Spotlight: encanamento — agendamento 24/7",st:"ideia",p:"education"},
+ {day:18,ch:"IG Post",t:"Depoimento real (com consentimento) — antes/depois",st:"ideia",p:"proof"},
+ {day:19,ch:"LinkedIn",t:"Mito x verdade: ‘IA de voz soa robótica’",st:"ideia",p:"authority"},
+ {day:20,ch:"IG Carrossel",t:"5 sinais de que você perde dinheiro no telefone",st:"ideia",p:"education"},
+ {day:23,ch:"IG Reel",t:"CTA: agende uma demo em voxmation.com/demo",st:"ideia",p:"conversion"}
+];
+
+const SEED_APPS=[
+ {url:"https://voxmation.com",desc:"Site da Voxmation — recepcionista de voz com IA 24/7 para empresas de serviços. Tem /demo com booking."},
+ {url:"https://masseurmatch.com",desc:"Diretório MasseurMatch — terapeutas independentes LGBTQ+. Planos de assinatura."},
+ {url:"https://therankflow.com",desc:"TheRankFlow — SEO local e dashboards para clientes (pausado)."},
+ {url:"https://app.notion.com/p/37a09af8b0a281459847d212d6f76ccd",desc:"Cérebro | OS (Notion, legado) — vai ser substituído por este app."}
+];
+
+function $(id){return document.getElementById(id)}
+function hasCowork(){return typeof window!=="undefined" && window.cowork}
+function escapeHtml(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function unwrap(r){if(r==null)return r;if(typeof r==="string"){try{return JSON.parse(r)}catch(e){return r}}if(r.content&&Array.isArray(r.content)){const t=r.content.map(c=>(c&&c.text)?c.text:"").join("");try{return JSON.parse(t)}catch(e){return t}}return r}
+async function callTool(n,a){if(!hasCowork())throw new Error("no-cowork");return unwrap(await window.cowork.callMcpTool(n,a))}
+function money(s){const m=(s||"").match(/\$[\d,]+(\.\d{2})?/);return m?m[0]:""}
+
+const loaded={};
+function showTab(t){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
+  document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+t));
+  if(t==="fin"&&!loaded.fin){loaded.fin=1;loadFinance();loadLedger();}
+  if(t==="dev"&&!loaded.dev){loaded.dev=1;loadSupa();loadVercel();}
+  if(t==="apps"&&!loaded.apps){loaded.apps=1;renderApps();}
+  if(t==="planos"&&!loaded.planos){loaded.planos=1;buildPlanos();}
+  if(t==="cal"&&!loaded.cal){loaded.cal=1;buildCalendar();}
+  if(t==="wiki"&&!loaded.wiki){loaded.wiki=1;buildWiki();}
+  if(t==="midia"&&!loaded.midia){loaded.midia=1;buildMediaFolders();loadMedia();}
+  if(t==="mapa"&&!loaded.mapa){loaded.mapa=1;buildDriveFolders();buildNotionMap();loadDriveRecent();}
+}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+/* LEADS */
+async function loadLeads(){try{let total=0,token=null,pages=0,more=true;do{const qp={per_page:200,fields:"Last_Name"};if(token)qp.page_token=token;const res=await callTool(ZOHO_GET,{path_variables:{module:"Leads"},query_params:qp});const info=(res&&res.data&&res.data.info)||{};const arr=(res&&res.data&&res.data.data)||[];total+=arr.length;token=info.next_page_token;more=!!info.more_records;pages++;}while(more&&token&&pages<5);$("leadsKpi").textContent=total+(more?"+":"");}catch(e){$("leadsKpi").textContent="—";}}
+async function loadBillsCard(){try{const res=await callTool(GMAIL,{query:"from:cash@square.com OR from:trueaccord.com OR subject:(payment due) OR subject:(overdue) newer_than:21d",pageSize:40});const th=(res&&res.threads)||[];let n=0;const seen=new Set();th.forEach(t=>{const m=(t.messages||[]).slice(-1)[0]||{};const s=(m.subject||"")+" "+(m.snippet||"");if(/due|overdue|attention|outstanding|balance/i.test(s)&&!/completed|received|resolved|you spent|declined|device/i.test(m.subject||"")){const k=(m.subject||"").slice(0,30);if(!seen.has(k)){seen.add(k);n++;}}});$("billsKpi").textContent=n;}catch(e){$("billsKpi").textContent="—";}}
+let mmDeploy="";
+function setTile(id,color,txt){const el=document.getElementById(id);if(!el)return;const d=el.querySelector(".hdot");if(d)d.className="hdot "+color;const s=el.querySelector(".hstat");if(s)s.textContent=txt;}
+async function loadHealth(){
+  try{const r=await callTool(VERCEL_DEP,{projectId:VPROJ[0].id,teamId:VTEAM});const st=((((r||{}).deployments||{}).deployments||[])[0]||{}).state;setTile("h-vox",st==="READY"?"green":st==="ERROR"?"red":"amber",st==="READY"?"Site no ar":(st||"—"));}catch(e){setTile("h-vox","gray","—");}
+  try{const r=await callTool(VERCEL_DEP,{projectId:VPROJ[1].id,teamId:VTEAM});mmDeploy=((((r||{}).deployments||{}).deployments||[])[0]||{}).state||"";}catch(e){}
+  let errs=0;for(const p of SUPA){try{const r=await callTool(SUPA_ADV,{project_id:p.id,type:"security"});const lints=(((r||{}).result||{}).lints)||[];errs+=lints.filter(l=>l.level==="ERROR").length;}catch(e){}}
+  setTile("h-sec",errs===0?"green":"amber",errs===0?"Sem erros":errs+" alerta"+(errs>1?"s":""));
+  setTile("h-mm",mmDeploy==="READY"?(errs?"amber":"green"):(mmDeploy==="ERROR"?"red":"amber"),mmDeploy==="READY"?(errs?"Site ok · "+errs+" sec":"Site ok"):(mmDeploy||"—"));
+  try{const r=await callTool(GMAIL,{query:"from:cash@square.com OR from:trueaccord.com OR subject:(payment due OR overdue OR payment failed) newer_than:21d",pageSize:30});const th=(r&&r.threads)||[];let n=0;const seen=new Set();th.forEach(t=>{const m=(t.messages||[]).slice(-1)[0]||{};const s=(m.subject||"")+(m.snippet||"");if(/due|overdue|failed|attention|outstanding|balance/i.test(s)&&!/completed|received|resolved|you spent|device/i.test(m.subject||"")){const k=(m.subject||"").slice(0,30);if(!seen.has(k)){seen.add(k);n++;}}});setTile("h-cash",n===0?"green":n<=2?"amber":"red",n===0?"Em dia":n+" a vencer");}catch(e){setTile("h-cash","gray","—");}
+}
+
+/* RADAR */
+function buildRadar(){const box=$("radar");box.innerHTML="";RADAR.forEach((r,i)=>{const el=document.createElement("div");el.className="ritem";const sv={high:"Alta",med:"Média",low:"Baixa"}[r.sev];
+  el.innerHTML='<span class="sev '+r.sev+'">'+sv+'</span><div class="rtxt"><b>'+escapeHtml(r.b)+'</b>'+escapeHtml(r.t)+'<div class="mini" style="margin-top:2px">'+escapeHtml(r.area)+'</div></div>';
+  const btn=document.createElement("button");btn.className="btn ok sm";btn.textContent="+ Tarefa";btn.onclick=()=>{addTask({task:r.b,priority:r.sev==="high"?"high":r.sev==="med"?"medium":"low",area:r.area,est:""});btn.textContent="✓ Adicionada";btn.disabled=true;};
+  el.appendChild(btn);box.appendChild(el);});}
+
+/* FINANCE */
+function renderFin(boxId,items,empty){const box=$(boxId);if(!items.length){box.innerHTML='<div class="empty">'+empty+'</div>';return;}box.innerHTML="";items.slice(0,15).forEach(it=>{const a=document.createElement("a");a.className="frow";a.href="https://mail.google.com/mail/u/0/#search/"+encodeURIComponent(it.subj.slice(0,30));a.target="_blank";a.innerHTML='<span>'+(it.amt?'<b>'+it.amt+'</b> ':'')+escapeHtml(it.from.split("@")[0].replace(/[<>"]/g,""))+' — '+escapeHtml(it.subj)+'</span><span class="mini">'+it.date+'</span>';box.appendChild(a);});}
+function parseTh(res,fn){const th=(res&&res.threads)||[];const seen=new Set();const out=[];th.forEach(t=>{const m=(t.messages||[]).slice(-1)[0]||{};const subj=m.subject||"",from=m.sender||"",snip=m.snippet||"";if(fn(subj,from,snip)){const amt=money(subj+" "+snip);const k=(subj.replace(/\$[\d.,]+/g,"")+from).slice(0,50);if(!seen.has(k)){seen.add(k);out.push({subj,from,amt,date:(m.date||"").slice(0,10)});}}});return out;}
+async function loadFinance(){
+  try{const d=await callTool(GMAIL,{query:"from:cash@square.com OR from:trueaccord.com OR subject:(payment due OR overdue OR payment failed) newer_than:21d",pageSize:40});renderFin("finDue",parseTh(d,(s,f)=>(/(due|overdue|payment failed|outstanding|balance|attention)/i.test(s)||/trueaccord/i.test(f))&&!/you spent|completed|received|resolved|device|declined/i.test(s)),"Nada a vencer. ✅");}catch(e){$("finDue").innerHTML='<div class="empty">Abra para conectar o Gmail.</div>';}
+  try{const t=await callTool(GMAIL,{query:"subject:(trial) OR from:trial-ending newer_than:60d",pageSize:30});renderFin("finTrial",parseTh(t,s=>/trial/i.test(s)),"Sem trials.");}catch(e){}
+  try{const s=await callTool(GMAIL,{query:"subject:(renew OR subscription OR membership OR \"your plan\") newer_than:60d",pageSize:30});renderFin("finSub",parseTh(s,x=>/(renew|subscription|membership|your plan|expiring|confirmed)/i.test(x)&&!/cancel/i.test(x)),"Sem renovações.");}catch(e){}
+  try{const c=await callTool(GMAIL,{query:"subject:(canceled OR cancelled OR cancellation) newer_than:90d",pageSize:30});renderFin("finCancel",parseTh(c,(s,f)=>/cancel/i.test(s)&&!/reservation|airbnb|marriott|hotel|towneplace|transfer/i.test(s+f)),"Sem cancelamentos.");}catch(e){}
+}
+async function loadLedger(){
+  try{
+    const res=await callTool(GMAIL,{query:"from:(cash@square.com OR venmo@venmo.com) OR subject:(receipt OR \"you spent\" OR purchase OR invoice OR payment) newer_than:45d",pageSize:50});
+    const th=(res&&res.threads)||[]; const seen=new Set(); const rows=[];
+    th.forEach(t=>{(t.messages||[]).forEach(m=>{
+      const subj=m.subject||"",snip=m.snippet||"";
+      const am=(subj+" "+snip).match(/\$[\d,]+(\.\d{2})?/); if(!am)return;
+      const amt=parseFloat(am[0].replace(/[$,]/g,"")); if(!amt||amt>100000)return;
+      let mm=subj.match(/ at (.+?)\s*$/i)||subj.match(/Receipt from (.+?)\s*-/i)||subj.match(/from (.+?)\s*-/i);
+      let merch=(mm?mm[1]:(m.sender||"").split("@")[0]).trim().replace(/[<>"]/g,"").slice(0,40);
+      const key=(m.date||"").slice(0,10)+merch+amt; if(seen.has(key))return; seen.add(key);
+      rows.push({date:(m.date||"").slice(0,10),merch,amt});
+    });});
+    rows.sort((a,b)=>a.date<b.date?1:-1);
+    const total=rows.reduce((s,r)=>s+r.amt,0);
+    $("ledgerTotal").textContent="$"+total.toFixed(2)+" ("+rows.length+" lançamentos)";
+    const box=$("ledgerList");
+    if(!rows.length){box.innerHTML='<div class="empty">Sem lançamentos detectados.</div>';}
+    else{box.innerHTML="";rows.slice(0,30).forEach(r=>{const d=document.createElement("div");d.className="frow";d.innerHTML='<span>'+escapeHtml(r.merch)+'</span><span><b style="color:var(--ink)">$'+r.amt.toFixed(2)+'</b> <span class="mini">'+r.date+'</span></span>';box.appendChild(d);});}
+    const grp={};rows.forEach(r=>{const k=r.merch.toLowerCase().replace(/[^a-z]/g,"").slice(0,16);if(!k)return;(grp[k]=grp[k]||{name:r.merch,count:0,sum:0});grp[k].count++;grp[k].sum+=r.amt;});
+    const rec=Object.values(grp).filter(g=>g.count>=2).sort((a,b)=>b.sum-a.sum);
+    const rb=$("ledgerRecur");
+    if(!rec.length){rb.innerHTML='<div class="empty">Nenhum recorrente óbvio (≥2 cobranças) nos 45 dias.</div>';}
+    else{rb.innerHTML="";rec.slice(0,15).forEach(g=>{const d=document.createElement("div");d.className="frow";d.innerHTML='<span>♻️ '+escapeHtml(g.name)+' <span class="mini">'+g.count+'×</span></span><span><b style="color:var(--red)">$'+g.sum.toFixed(2)+'</b></span>';rb.appendChild(d);});}
+  }catch(e){$("ledgerList").innerHTML='<div class="empty">Abra para conectar o Gmail.</div>';}
+}
+
+/* DEVOPS */
+async function loadSupa(){
+  const box=$("supaList");let html="";let errCount=0;
+  for(const p of SUPA){
+    try{const res=await callTool(SUPA_ADV,{project_id:p.id,type:"security"});const lints=(res&&res.result&&res.result.lints)||[];
+      const byLv={ERROR:[],WARN:[],INFO:[]};lints.forEach(l=>{(byLv[l.level]||byLv.INFO).push(l);});errCount+=byLv.ERROR.length;
+      html+='<div class="label" style="margin:6px 0 8px">'+escapeHtml(p.n)+' — <span class="lv ERROR">'+byLv.ERROR.length+' ERROR</span> <span class="lv WARN">'+byLv.WARN.length+' WARN</span> <span class="lv INFO">'+byLv.INFO.length+' INFO</span></div>';
+      const show=byLv.ERROR.concat(byLv.WARN).slice(0,8);
+      show.forEach(l=>{html+='<div class="adv"><span><span class="lv '+l.level+'">'+l.level+'</span> &nbsp;'+escapeHtml(l.detail||l.title)+'</span>'+(l.remediation?'<a class="mini" href="'+l.remediation+'" target="_blank">fix ↗</a>':'')+'</div>';});
+      html+='<div style="height:10px"></div>';
+    }catch(e){html+='<div class="empty">'+escapeHtml(p.n)+': abra para conectar o Supabase.</div>';}
+  }
+  box.innerHTML=html||'<div class="empty">Sem dados.</div>';
+  const dk=$("devKpi");dk.textContent=(errCount?errCount+" erro"+(errCount>1?"s":""):"ver");
+}
+async function loadVercel(){
+  const box=$("vercelList");box.innerHTML="";
+  for(const p of VPROJ){
+    try{const res=await callTool(VERCEL_DEP,{projectId:p.id,teamId:VTEAM});const deps=(res&&res.deployments&&res.deployments.deployments)||[];const last=deps[0]||{};const st=last.state||"—";
+      const a=document.createElement("a");a.className="dep";a.href=last.inspectorUrl||"#";a.target="_blank";a.style.textDecoration="none";a.style.color="inherit";
+      a.innerHTML='<span>'+escapeHtml(p.n)+' <span class="mini">'+escapeHtml((last.meta&&last.meta.githubCommitMessage||"").split("\\n")[0].slice(0,46))+'</span></span><span class="st '+st+'">'+st+'</span>';box.appendChild(a);
+    }catch(e){const d=document.createElement("div");d.className="empty";d.textContent=p.n+": abra para conectar o Vercel.";box.appendChild(d);}
+  }
+}
+
+/* APPS */
+function loadApps(){try{return JSON.parse(localStorage.getItem(LS_APPS)||"null")||SEED_APPS.slice()}catch(e){return SEED_APPS.slice()}}
+function saveApps(a){try{localStorage.setItem(LS_APPS,JSON.stringify(a))}catch(e){}}
+function renderApps(){const list=$("appList");const apps=loadApps();list.innerHTML="";apps.forEach((ap,i)=>{const el=document.createElement("div");el.className="app";
+  el.innerHTML='<div><a href="'+escapeHtml(ap.url)+'" target="_blank" style="font-weight:650;color:var(--accent);text-decoration:none">'+escapeHtml(ap.url.replace(/^https?:\/\//,""))+' ↗</a><div class="ad">'+escapeHtml(ap.desc||"")+'</div></div>';
+  const del=document.createElement("button");del.className="btn bad sm";del.textContent="remover";del.onclick=()=>{const a=loadApps();a.splice(i,1);saveApps(a);renderApps();};el.appendChild(del);list.appendChild(el);});}
+async function addApp(){const url=$("appUrl").value.trim();if(!url)return;const msg=$("appMsg");msg.innerHTML='<span class="spin"></span> Gerando descrição…';let desc="";
+  try{if(!hasCowork())throw new Error("x");const r=await window.cowork.askClaude('Em português e em UMA frase curta (máx 18 palavras), descreva o que provavelmente é este app/site pelo link. Sem floreio. Link: '+url,[]);desc=(typeof r==="string"?r:(r&&r.text?r.text:"")).trim().replace(/^"|"$/g,"");}catch(e){desc="";}
+  const apps=loadApps();apps.unshift({url,desc:desc||"(descrição indisponível — adicione manualmente)"});saveApps(apps);$("appUrl").value="";msg.textContent="A IA gera uma descrição curta a partir do link.";renderApps();}
+
+/* CALENDAR */
+function buildCalendar(){
+  const grid=$("calGrid");const dows=["D","S","T","Q","Q","S","S"];grid.innerHTML=dows.map(d=>'<div class="dow">'+d+'</div>').join("");
+  const first=new Date(2026,5,1).getDay();const days=30;const byDay={};POSTS.forEach(p=>{(byDay[p.day]=byDay[p.day]||[]).push(p);});
+  for(let i=0;i<first;i++)grid.innerHTML+='<div class="cell" style="background:transparent;border:0"></div>';
+  for(let d=1;d<=days;d++){const ps=byDay[d]||[];let c='<div class="cell'+(ps.length?' has':'')+'"><div class="n">'+d+'</div>';ps.forEach(p=>{c+='<span class="pill p-'+p.p+'" title="'+escapeHtml(p.t)+'">'+escapeHtml(p.ch)+'</span>';});c+='</div>';grid.innerHTML+=c;}
+  $("calList").innerHTML=POSTS.map(p=>'<div class="frow"><span><b style="color:var(--accent)">Jun '+p.day+'</b> · '+escapeHtml(p.ch)+' — '+escapeHtml(p.t)+'</span><span class="st '+p.st+'">'+p.st+'</span></div>').join("");
+}
+
+/* WIKI */
+const DOC=(id)=>"https://drive.google.com/file/d/"+id+"/view";
+const GDOC=(id)=>"https://docs.google.com/document/d/"+id+"/edit";
+const GSHEET=(id)=>"https://docs.google.com/spreadsheets/d/"+id+"/edit";
+function buildWiki(){$("wikiPanel").innerHTML=`
+  <div class="navw"><a class="chip" href="#w-vis">Visão</a><a class="chip" href="#w-vox">Voxmation</a><a class="chip" href="#w-mm">MasseurMatch</a><a class="chip" href="#w-stack">Stack</a><a class="chip" href="#w-fontes">Fontes</a></div>
+  <h3 id="w-vis">Visão geral</h3><p><b>XRANKFLOW Media Group LLC</b> (Dover, Delaware). Holding de 3 marcas. admin@xrankflow.com · segatti.hall@gmail.com.</p>
+  <h3 id="w-vox">Voxmation</h3><p>Recepcionista de voz com IA 24/7 para home services. “answer calls, qualify leads, book jobs”. Verticais: encanamento, roofing, HVAC, elétrica, solar, dentista, salões, staffing… Foco: Texas. Marca azul/laranja/branco, mascotes 3D. CTA: Book a demo. Stack de voz: ElevenLabs + Twilio.</p>
+  <p><b>Conteúdo:</b> pilares conversion/education/authority/proof; canais IG/TikTok/YouTube/LinkedIn/FB; hashtags #VOXmatiON #AIAutomation #BookedJobs. <b>Top keywords:</b> virtual receptionist, ai voice agent, call answering service, online booking.</p>
+  <p><b>Lead Engine v2:</b> ≥75 leads/dia (Apollo+Google Maps) → ICP scoring → Zoho (lote, 6h). Cadência de 4 e-mails. ~415 leads carregados.</p>
+  <h3 id="w-mm">MasseurMatch</h3><p>Diretório privacy-first de terapeutas LGBTQ+ (assinatura/anúncio). Preços canônicos: Free · Standard $39 · Pro $79 · Elite $99. Tech: Supabase + Vercel + PWA. TAM real (due diligence): $9,5M–$17,5M; projeção Ano 3 ~$2,1M. QA: 39 issues (2 críticos).</p>
+  <h3 id="w-stack">Stack</h3><p>Zoho · Make.com · Apollo · Supabase (2 projetos) · Vercel (team mm-website) · Render · GitHub segattihall-ops · Stripe · Entri (DNS).</p>
+  <h3 id="w-fontes">Fontes (Drive)</h3><ul>
+    <li><a href="${GSHEET("1nnuLug7CrDYfkoE5kbH7Xb5XLJTqEPCZ")}" target="_blank">Voxmation Content OS / 30 dias ↗</a></li>
+    <li><a href="${GSHEET("17nmvLk3AxhvyHZkJK1BAHKe9aZnV0lmsxkKHlNiQguE")}" target="_blank">Voxmation — 100 keywords ↗</a></li>
+    <li><a href="${DOC("1vsnbp9IECIadmpVSZPXczssZCqU5Toh2")}" target="_blank">Lead Engine v2 (setup) ↗</a></li>
+    <li><a href="${GDOC("1pH3idhsztk9H9dNWlUwPeiNb3oRYt_QUAE1eedle-Uk")}" target="_blank">MasseurMatch — Due Diligence ↗</a></li>
+    <li><a href="${GSHEET("1zHubE2rYC4owEjVmm3i1lJPcltgmzTFeJLOEOrbRt0s")}" target="_blank">MasseurMatch — QA Tracker ↗</a></li>
+    <li><a href="${CHATGPT_EXPORTS}" target="_blank">Arquivo: exports do ChatGPT ↗</a></li>
+  </ul>`;}
+
+/* MEDIA + DRIVE */
+function fileIcon(m){m=m||"";if(m.includes("folder"))return"📁";if(m.includes("spreadsheet")||m.includes("excel"))return"📊";if(m.includes("image"))return"🖼️";if(m.includes("document")||m.includes("word"))return"📝";if(m.includes("pdf"))return"📕";if(m.includes("html"))return"🌐";if(m.includes("video"))return"🎬";return"📄"}
+function buildMediaFolders(){$("mediaFolders").innerHTML=MEDIA_FOLDERS.map(f=>'<a class="chip" href="https://drive.google.com/drive/folders/'+f.id+'" target="_blank"><span class="e">🖼️</span>'+escapeHtml(f.n)+'</a>').join("");}
+async function loadMedia(){try{const res=await callTool(DRIVE_SEARCH,{query:"mimeType contains 'image/' or mimeType contains 'video/'",pageSize:20,excludeContentSnippets:true});const files=(res&&res.files)||[];const box=$("mediaList");if(!files.length){box.innerHTML='<div class="empty">Sem mídia.</div>';return;}box.innerHTML="";files.forEach(f=>{const a=document.createElement("a");a.className="frow";a.href=f.viewUrl||"#";a.target="_blank";a.innerHTML='<span>'+fileIcon(f.mimeType)+' '+escapeHtml(f.title||"")+'</span><span class="mini">'+((f.modifiedTime||"").slice(0,10))+'</span>';box.appendChild(a);});}catch(e){$("mediaList").innerHTML='<div class="empty">Abra para conectar o Drive.</div>';}}
+function buildDriveFolders(){$("driveFolders").innerHTML=DRIVE_FOLDERS.map(f=>'<a class="chip" href="https://drive.google.com/drive/folders/'+f.id+'" target="_blank"><span class="e">📁</span>'+escapeHtml(f.n)+'</a>').join("");}
+async function loadDriveRecent(){try{const res=await callTool(DRIVE_RECENT,{pageSize:12,excludeContentSnippets:true});const files=(res&&res.files)||[];const box=$("driveRecent");if(!files.length){box.innerHTML='<div class="empty">Sem arquivos.</div>';return;}box.innerHTML="";files.forEach(f=>{const a=document.createElement("a");a.className="frow";a.href=f.viewUrl||"#";a.target="_blank";a.innerHTML='<span>'+fileIcon(f.mimeType)+' '+escapeHtml(f.title||"")+'</span><span class="mini">'+((f.modifiedTime||"").slice(0,10))+'</span>';box.appendChild(a);});}catch(e){$("driveRecent").innerHTML='<div class="empty">Abra para conectar o Drive.</div>';}}
+function buildNotionMap(){const m=$("notionMap");const sec=(t,items)=>'<div class="mapcol"><h4>'+t+'</h4>'+items.map(i=>'<a href="'+i.u+'" target="_blank">'+escapeHtml(i.n)+'</a>').join("")+'</div>';m.innerHTML='<div class="mapgrid">'+sec("Centrais",NOTION_MAP.Centrais)+sec("Marcas",NOTION_MAP.Marcas)+'</div>';}
+
+/* AI TASK MANAGER (local) */
+let currentAnalysis=null;
+function parseJSON(raw){let s=typeof raw==="string"?raw:(raw&&raw.text?raw.text:JSON.stringify(raw));s=s.replace(/```json/gi,"").replace(/```/g,"");const a=s.indexOf("{"),b=s.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(s.slice(a,b+1))}catch(e){}}return null;}
+async function analyze(){const text=$("taskInput").value.trim();if(!text)return;$("analyzeBtn").disabled=true;$("analyzeBtn").innerHTML='<span class="spin"></span> Analisando…';let a=null;
+  try{if(!hasCowork())throw new Error("x");const prompt='Analisador do OS XRANKFLOW (Voxmation, MasseurMatch, TheRankFlow, Finanças). Responda APENAS JSON: {"priority":"high|medium|low","type":"Automático|Manual","estimatedTime":"curto","area":"Voxmation|MasseurMatch|TheRankFlow|Finanças|Pessoal|XRANKFLOW","prompt":"prompt acionável"}. Tarefa: "'+text+'"';a=parseJSON(await window.cowork.askClaude(prompt,[]));}catch(e){}
+  if(!a)a=heur(text);currentAnalysis={task:text,...a};renderAnalysis(currentAnalysis);$("analyzeBtn").disabled=false;$("analyzeBtn").textContent="Analisar com IA";}
+function heur(text){const t=text.toLowerCase();let p=/urgent|hoje|agora|atrasad|vencendo/.test(t)?"high":/depois|talvez/.test(t)?"low":"medium";const au=/email|buscar|analisar|listar|resumo|cancelar/.test(t);let ar="XRANKFLOW";if(/voxmation|lead|hvac|zoho/.test(t))ar="Voxmation";else if(/masseur|therapist/.test(t))ar="MasseurMatch";else if(/pagar|conta|fatura|bill|trial|assinatura|financ/.test(t))ar="Finanças";return{priority:p,type:au?"Automático":"Manual",estimatedTime:au?"5 min":"15–30 min",area:ar,prompt:"# Tarefa: "+text+"\n# Área: "+ar};}
+function renderAnalysis(a){const pr={high:["Alta","t-high"],medium:["Média","t-med"],low:["Baixa","t-low"]}[a.priority]||["Média","t-med"];const ty=a.type==="Automático"?["⚙️ Automático","t-auto"]:["✋ Manual","t-man"];$("analysisTags").innerHTML='<span class="tag '+pr[1]+'">🎯 '+pr[0]+'</span><span class="tag '+ty[1]+'">'+ty[0]+'</span><span class="tag t-area">📁 '+escapeHtml(a.area||"—")+'</span><span class="tag t-low">⏱️ '+escapeHtml(a.estimatedTime||"—")+'</span>';$("analysisTaskText").textContent=a.task;$("analysisPrompt").textContent=a.prompt||"";$("analysisBox").style.display="block";}
+function addTask(o){const tk=load();tk.push({id:String(Date.now())+Math.floor(Math.random()*1000),task:o.task,priority:o.priority||"medium",area:o.area||"",owner:o.owner||"",est:o.est||"",details:o.details||"",status:"todo",thread:[]});save(tk);render();}
+function seedTasks(){ if(load().length) return; save(SEED_TASKS.map((s,i)=>({id:"seed"+i,status:"todo",thread:[],est:"",...s}))); }
+function approve(){if(!currentAnalysis)return;addTask({task:currentAnalysis.task,priority:currentAnalysis.priority,area:currentAnalysis.area,est:currentAnalysis.estimatedTime});$("taskInput").value="";$("analysisBox").style.display="none";currentAnalysis=null;}
+function load(){try{return JSON.parse(localStorage.getItem(LS_KEY)||"[]")}catch(e){return[]}}
+function save(t){try{localStorage.setItem(LS_KEY,JSON.stringify(t))}catch(e){}}
+const ORDER={high:0,medium:1,low:2};
+function render(){
+  const tk=load().sort((a,b)=>(ORDER[a.priority]-ORDER[b.priority])||(String(b.id)<String(a.id)?-1:1));
+  const L=$("taskList");L.innerHTML="";$("openKpi").textContent=tk.filter(t=>t.status!=="done").length;
+  if(!tk.length){L.innerHTML='<div class="empty">Sem tarefas.</div>';return;}
+  tk.forEach(t=>{
+    const c=document.createElement("div");c.className="taskc"+(t.status==="done"?" done":"");c.dataset.tid=t.id;
+    const own=t.owner?('<span class="own '+(t.owner==="IA"?"ia":"vc")+'">'+escapeHtml(t.owner)+'</span>'):"";
+    c.innerHTML='<div class="taskhd"><span class="dot '+t.priority+'"></span><span class="ttl">'+escapeHtml(t.task)+'</span>'+own+'<span class="meta">'+escapeHtml(t.area||"")+'</span><button class="btn sm ghost done">'+(t.status==="done"?"↺":"✓")+'</button></div><div class="taskbody" hidden><div class="tdetails">'+escapeHtml(t.details||"Sem detalhes.")+'</div><div class="trow"><button class="btn sm ghost tcopy">📋 Copiar prompt</button><button class="btn sm ghost texec">▶ Executar no chat</button></div><div class="thread"></div><textarea class="tmsg" placeholder="Escreva pra IA sobre esta tarefa (dúvida, contexto, ou peça pra executar)…" style="min-height:42px"></textarea><div class="row" style="margin-top:6px"><button class="btn sm primary tsend">Perguntar à IA</button><span class="mini tmsgst"></span></div></div>';
+    c.querySelector(".ttl").onclick=()=>{const b=c.querySelector(".taskbody");b.hidden=!b.hidden;if(!b.hidden)renderThread(c,t.id);};
+    c.querySelector(".done").onclick=(e)=>{e.stopPropagation();const all=load();const i=all.findIndex(x=>x.id===t.id);if(i>=0){all[i].status=all[i].status==="done"?"todo":"done";save(all);render();}};
+    c.querySelector(".tsend").onclick=()=>sendTaskMsg(c,t.id);
+    c.querySelector(".tcopy").onclick=()=>copyPrompt(taskPrompt(t));
+    c.querySelector(".texec").onclick=()=>execPrompt(taskPrompt(t));
+    c.querySelector(".tmsg").addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")sendTaskMsg(c,t.id);});
+    L.appendChild(c);
+  });
+}
+function renderThread(c,id){const t=load().find(x=>x.id===id);if(!t)return;const box=c.querySelector(".thread");box.innerHTML=(t.thread||[]).map(m=>'<div class="bubble '+(m.role==="user"?"u":"a")+'">'+escapeHtml(m.text)+'</div>').join("");}
+async function sendTaskMsg(c,id){
+  const ta=c.querySelector(".tmsg"),st=c.querySelector(".tmsgst"),msg=ta.value.trim();if(!msg)return;
+  let all=load();let i=all.findIndex(x=>x.id===id);if(i<0)return;
+  all[i].thread=all[i].thread||[];all[i].thread.push({role:"user",text:msg});save(all);ta.value="";renderThread(c,id);
+  st.innerHTML='<span class="spin"></span> Atlas analisando…';
+  let reply="";
+  try{ if(!hasCowork())throw new Error("x");
+    const t=all[i];const hist=(t.thread||[]).map(m=>(m.role==="user"?"Você":"Atlas")+": "+m.text).join("\n");
+    const prompt='Você é Atlas, assistente executivo da holding XRankFlow (Voxmation, MasseurMatch, TheRankFlow, DespachanteUSA). Responda em PT-BR, prático e curto, sobre ESTA tarefa. Título: "'+t.task+'". Área: '+(t.area||"")+'. Responsável: '+(t.owner||"")+'. Detalhes: '+(t.details||"")+'. Conversa:\n'+hist+'\nResponda como Atlas com análise e próximos passos concretos.';
+    const r=await window.cowork.askClaude(prompt,[]);reply=(typeof r==="string"?r:(r&&r.text?r.text:"")).trim();
+  }catch(e){reply="(IA indisponível agora — tente de novo com o app aberto.)";}
+  let all2=load();let j=all2.findIndex(x=>x.id===id);if(j>=0){all2[j].thread=all2[j].thread||[];all2[j].thread.push({role:"ai",text:reply||"(sem resposta)"});save(all2);}
+  st.textContent="";renderThread(c,id);
+}
+function taskPrompt(t){ if(t.prompt) return t.prompt; return t.owner==="IA"
+  ? 'Atlas, execute esta tarefa: "'+t.task+'". Contexto: '+(t.details||"")+' — antes de aplicar mudança de código ou banco, me mostre o que vai alterar.'
+  : 'Atlas, me guie passo a passo (rápido e prático) para resolver: "'+t.task+'". Contexto: '+(t.details||""); }
+function toast(msg){let el=document.getElementById("os_toast");if(!el){el=document.createElement("div");el.id="os_toast";el.className="toast";document.body.appendChild(el);}el.textContent=msg;el.classList.add("show");clearTimeout(window.__tt);window.__tt=setTimeout(()=>el.classList.remove("show"),2400);}
+function fallbackCopy(text){try{const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);toast("Prompt copiado ✓");}catch(e){toast("Copie manualmente");}}
+function copyPrompt(text){ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toast("Prompt copiado ✓")).catch(()=>fallbackCopy(text)); } else fallbackCopy(text); }
+function execPrompt(text){ try{ if(typeof sendPrompt==="function"){sendPrompt(text);toast("Enviado pro chat ▶");return;} if(window.cowork&&typeof window.cowork.sendPrompt==="function"){window.cowork.sendPrompt(text);toast("Enviado pro chat ▶");return;} }catch(e){} copyPrompt(text); toast("Copiado — cole num chat novo do Atlas/Code ▶"); }
+
+/* INIT */
+function greet(){const h=new Date().getHours();const g=h<12?"Bom dia":h<18?"Boa tarde":"Boa noite";const d=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"});$("greeting").textContent=g+", Segatti · "+d+" · seu assistente executivo";}
+$("analyzeBtn").onclick=analyze;$("approveBtn").onclick=approve;
+$("discardBtn").onclick=()=>{$("analysisBox").style.display="none";currentAnalysis=null;};
+$("clearDone").onclick=()=>{save(load().filter(t=>t.status!=="done"));render();};
+$("taskInput").addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")analyze();});
+$("quickAdd").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.value.trim()){addTask({task:e.target.value.trim(),priority:"medium"});e.target.value="";}});
+$("appAdd").onclick=addApp;
+/* PLANOS / PLAN FINDER (Voxmation) */
+const VX_LIMITS={
+ S:{emails:"5,000 emails",sms:"300 SMS",voice:"100 voice min",ai:"500 AI messages",pipelines:"1 pipeline",support:"48h support"},
+ M:{emails:"20,000 emails",sms:"1,500 SMS",voice:"300 voice min",ai:"2,000 AI messages",pipelines:"3 pipelines",support:"24h support"},
+ L:{emails:"60,000 emails",sms:"5,000 SMS",voice:"800 voice min",ai:"8,000 AI messages",pipelines:"Unlimited pipelines",support:"8h support"},
+ ENT:{emails:"Custom volumes",sms:"Custom",voice:"Custom",ai:"Custom",pipelines:"Unlimited",support:"Dedicated manager"}
+};
+const VX_OVERAGE=[["AI voice","$0.14/min"],["Outbound","$0.0175/min"],["Inbound","$0.011/min"],["AI msg","$0.021/msg"],["Email","$0.0007"],["SMS","$0.0087/seg"],["WhatsApp","$0.0777/event"]];
+const VX_SVC=[
+ {id:"guard",nm:"VX Guard",code:"VX-SVC-GRD",low:67,mid:97,sell:147,ds:"Missed-call recovery — texts & calls back every missed call in under 2 min, qualifies & books"},
+ {id:"book",nm:"VX Book",code:"VX-SVC-BOK",low:87,mid:147,sell:197,ds:"24/7 AI receptionist — answers every inbound call in under 2 seconds"},
+ {id:"filter",nm:"VX Filter",code:"VX-SVC-FLT",low:47,mid:77,sell:127,ds:"Lead qualification — service, location, urgency, budget; scores every lead"},
+ {id:"route",nm:"VX Route",code:"VX-SVC-RTE",low:37,mid:57,sell:97,ds:"Smart routing — sends each lead to the right branch, tech or calendar"},
+ {id:"sync",nm:"VX Sync",code:"VX-SVC-SYN",low:47,mid:97,sell:147,ds:"CRM automation — every call becomes a clean, scored lead"},
+ {id:"flow",nm:"VX Flow",code:"VX-SVC-FLW",low:57,mid:97,sell:147,ds:"AI follow-up — 21-day chase by SMS, email & voice"},
+ {id:"lock",nm:"VX Lock",code:"VX-SVC-LCK",low:57,mid:97,sell:147,ds:"No-show killer — confirmation chain cuts no-shows up to 65%"},
+ {id:"pulse",nm:"VX Pulse",code:"VX-SVC-PLS",low:77,mid:127,sell:197,ds:"Lead reactivation — AI calls old & cold leads to generate jobs"},
+ {id:"star",nm:"VX Star",code:"VX-SVC-STR",low:37,mid:67,sell:97,ds:"Review requests — automatic Google review after every job"},
+ {id:"desk",nm:"VX Desk",code:"VX-SVC-DSK",low:47,mid:77,sell:127,ds:"AI support — answers hours, coverage, pricing & FAQs"},
+ {id:"brain",nm:"VX Brain",code:"VX-SVC-BRN",low:57,mid:97,sell:197,ds:"Marketing AI suite — content, reviews, funnels & agent studio"},
+ {id:"launch",nm:"VX Launch",code:"VX-SVC-LNC",low:57,mid:97,sell:147,ds:"Client onboarding — 30-day automated onboarding"}
+];
+const VX_PLANS=[
+ {nm:"Starter",code:"VX-PLN-STR",low:147,mid:197,sell:297,suMid:297,tier:"S",who:"Solo — stop missing calls",inc:["guard","filter","sync"]},
+ {nm:"Growth",code:"VX-PLN-GRW",low:297,mid:397,sell:547,suMid:497,tier:"M",pop:true,who:"Teams of 2–7 — full receptionist",inc:["guard","filter","sync","book","route","flow","lock","star"]},
+ {nm:"Pro",code:"VX-PLN-PRO",low:497,mid:697,sell:897,suMid:797,tier:"L",who:"High volume, multi-location",inc:["guard","filter","sync","book","route","flow","lock","star","pulse","desk","brain"]},
+ {nm:"Enterprise",code:"VX-PLN-ENT",mid:"Custom",tier:"ENT",who:"Franchises & chains",inc:["guard","filter","sync","book","route","flow","lock","star","pulse","desk","brain","launch"]}
+];
+const VX_BASE={solo:{nm:"VX Base S",p:147,tier:"S"},small:{nm:"VX Base M",p:247,tier:"M"},large:{nm:"VX Base L",p:397,tier:"L"},franchise:{nm:"VX Base L",p:397,tier:"L"}};
+function vxMoney(n){return typeof n==="number"?("$"+(n%1?n.toFixed(2):n)):n;}
+function svc(id){return VX_SVC.find(s=>s.id===id);}
+function painLabel(id){return {guard:"I miss calls when I'm on the job",book:"Nobody answers after-hours / weekends",filter:"I waste time with tire-kickers",flow:"Leads go cold after I send the estimate",lock:"People book and don't show up",pulse:"My old customers never come back",sync:"My CRM is a mess / I use paper",route:"I have two crews / two cities",star:"I need more Google reviews",desk:"I answer the same questions all day"}[id]||id;}
+function limitsHtml(tier){const L=VX_LIMITS[tier]||VX_LIMITS.M;return '<div class="pfopts" style="gap:6px">'+[["✉️",L.emails],["💬",L.sms],["📞",L.voice],["🤖",L.ai],["🗂️",L.pipelines],["🛟",L.support]].map(x=>'<div class="pfopt" style="cursor:default">'+x[0]+' '+x[1]+'</div>').join("")+'</div>';}
+function overageHtml(){return '<div class="mini" style="line-height:1.9">'+VX_OVERAGE.map(o=>o[0]+": <b>"+o[1]+"</b>").join(" · ")+'</div>';}
+function planCard(plan,priceTxt,why,incIds,tier){
+  let h='<div class="label" style="color:var(--accent)">Recommended — show this on the call</div>';
+  h+='<div style="font-size:24px;font-weight:800;margin:2px 0">'+escapeHtml(plan)+'</div><div style="font-size:19px;font-weight:700">'+escapeHtml(priceTxt)+'</div>';
+  h+='<div class="mini" style="margin:6px 0 10px">'+escapeHtml(why)+'</div>';
+  h+='<div class="label" style="margin:6px 0 6px">✓ Everything included</div><div class="list">'+incIds.map(id=>{const s=svc(id);return '<div class="frow"><span><b>'+s.nm+'</b> — '+escapeHtml(s.ds)+'</span></div>';}).join("")+'</div>';
+  h+='<div class="label" style="margin:14px 0 6px">📦 Monthly allowances (limits)</div>'+limitsHtml(tier);
+  h+='<div class="label" style="margin:14px 0 6px">⚡ Beyond limits (pay-as-you-go)</div>'+overageHtml();
+  h+='<a class="btn orange sm" href="https://voxmation.com/demo" target="_blank" style="display:inline-block;margin-top:12px;text-decoration:none">Book a demo →</a>';
+  return h;
+}
+let vxTeam=null;const vxPains=new Set();
+function buildPlanos(){
+  const w=$("planosWrap");const painIds=["guard","book","filter","flow","lock","pulse","sync","route","star","desk"];
+  let h='<div class="panel"><div class="label" style="margin-bottom:8px">🔎 Plan finder — 2 questions</div>';
+  h+='<div class="mini" style="margin-bottom:6px">1 · Team size</div><div class="pfopts" id="vxTeam">'+[["solo","Just me"],["small","2–7 people"],["large","8+ / high volume"],["franchise","Multi-location / franchise"]].map(o=>'<div class="pfopt" data-v="'+o[0]+'">'+o[1]+'</div>').join("")+'</div>';
+  h+='<div class="mini" style="margin:12px 0 6px">2 · What is costing you jobs? (check all that apply)</div><div class="pfopts" id="vxPains">'+painIds.map(id=>'<div class="pfopt" data-v="'+id+'">'+painLabel(id)+'</div>').join("")+'</div>';
+  h+='<button class="btn primary sm" id="vxGo" style="margin-top:12px">See recommended plan →</button><div class="resx" id="vxRes"></div></div>';
+  h+='<div class="section"><h2>Plans (single client-facing price)</h2><div class="grid">'+VX_PLANS.map(p=>'<div class="card"><div class="label">'+p.nm+(p.pop?" ⭐":"")+'</div><div class="kpi">'+vxMoney(p.mid)+(typeof p.mid==="number"?'<small>/mo</small>':"")+'</div><div class="mini">'+(p.suMid?"+ "+vxMoney(p.suMid)+" setup · ":"")+escapeHtml(p.who)+'</div></div>').join("")+'</div><div class="mini" style="margin-top:8px">🚀 Founders (10 spots): $347/mo + $497 setup · testimonial required.</div></div>';
+  h+='<div class="section"><div class="panel"><details><summary style="cursor:pointer;font-weight:700">🔒 Internal sales reference (LOW · MID · SELL + codes)</summary><div class="mini" style="margin:8px 0">Confidential — the client sees one price (MID). Use this to quote.</div><div class="label" style="margin:6px 0 4px">Plans</div><div class="list">'+VX_PLANS.map(p=>'<div class="frow"><span>'+p.nm+' <span class="mini">'+p.code+'</span></span><span class="mini">LOW '+vxMoney(p.low||"—")+' · <b style="color:var(--ink)">MID '+vxMoney(p.mid)+'</b> · SELL '+vxMoney(p.sell||"—")+'</span></div>').join("")+'</div><div class="label" style="margin:12px 0 4px">A la carte services</div><div class="list">'+VX_SVC.map(s=>'<div class="frow"><span>'+s.nm+' <span class="mini">'+s.code+'</span></span><span class="mini">'+vxMoney(s.low)+' · <b style="color:var(--ink)">'+vxMoney(s.mid)+'</b> · '+vxMoney(s.sell)+'</span></div>').join("")+'</div></details></div></div>';
+  w.innerHTML=h;
+  vxTeam=null;vxPains.clear();
+  w.querySelectorAll("#vxTeam .pfopt").forEach(o=>o.onclick=()=>{w.querySelectorAll("#vxTeam .pfopt").forEach(x=>x.classList.remove("sel"));o.classList.add("sel");vxTeam=o.dataset.v;});
+  w.querySelectorAll("#vxPains .pfopt").forEach(o=>o.onclick=()=>{o.classList.toggle("sel");const v=o.dataset.v;vxPains.has(v)?vxPains.delete(v):vxPains.add(v);});
+  $("vxGo").onclick=vxRecommend;
+}
+function vxRecommend(){
+  if(!vxTeam){toast("Pick your team size first");return;}
+  const n=vxPains.size;const R=$("vxRes");
+  if(vxTeam==="franchise"){R.innerHTML=planCard("Enterprise","Custom pricing","Multi-location: custom volumes, routing and a dedicated manager.",VX_PLANS[3].inc,"ENT");}
+  else if(vxTeam==="large"||n>=4){R.innerHTML=planCard("Pro","$697/mo + $797 setup","High volume and several needs — Pro delivers the full stack for far less than buying à la carte.",VX_PLANS[2].inc,"L");}
+  else if(n>=2||vxTeam==="small"){R.innerHTML=planCard("Growth","$397/mo + $497 setup","A few pains and a small team — Growth bundles everything you need (our most popular).",VX_PLANS[1].inc,"M");}
+  else if(n===1){const only=[...vxPains][0];
+    if(only==="guard"){R.innerHTML=planCard("Starter","$197/mo + $297 setup","You just need to stop missing calls — Starter does exactly that.",VX_PLANS[0].inc,"S");}
+    else{const s=svc(only);const b=VX_BASE[vxTeam];const tot=b.p+s.mid;
+      let h='<div class="label" style="color:var(--accent)">Recommended — Build your own</div><div style="font-size:24px;font-weight:800;margin:2px 0">'+b.nm+' + '+s.nm+'</div><div style="font-size:19px;font-weight:700">'+vxMoney(tot)+'/mo</div><div class="mini" style="margin:6px 0 10px">One specific need. Lean build: '+b.nm+' ('+vxMoney(b.p)+') + '+s.nm+' ('+vxMoney(s.mid)+'). In 60–90 days, Growth often becomes the better value.</div>';
+      h+='<div class="label" style="margin:6px 0 6px">✓ Included</div><div class="list"><div class="frow"><span><b>'+b.nm+'</b> — foundation: calls, SMS, email, AI messages & CRM</span></div><div class="frow"><span><b>'+s.nm+'</b> — '+escapeHtml(s.ds)+'</span></div></div>';
+      h+='<div class="label" style="margin:14px 0 6px">📦 Monthly allowances (limits)</div>'+limitsHtml(b.tier);
+      h+='<div class="label" style="margin:14px 0 6px">⚡ Beyond limits (pay-as-you-go)</div>'+overageHtml();
+      h+='<a class="btn orange sm" href="https://voxmation.com/demo" target="_blank" style="display:inline-block;margin-top:12px;text-decoration:none">Book a demo →</a>';
+      R.innerHTML=h;}}
+  else{R.innerHTML=planCard("Starter","$197/mo + $297 setup","A solid starting point — capture every missed call and qualify every lead.",VX_PLANS[0].inc,"S");}
+  R.classList.add("show");R.scrollIntoView({behavior:"smooth",block:"center"});
+}
+/* COMMAND PALETTE + SHORTCUTS */
+const CMDS=[
+ {n:"Ir para Hoje",k:"1",run:()=>showTab("hoje")},
+ {n:"Ir para Finanças",k:"2",run:()=>showTab("fin")},
+ {n:"Ir para DevOps",k:"3",run:()=>showTab("dev")},
+ {n:"Ir para Apps",k:"4",run:()=>showTab("apps")},
+ {n:"Ir para Planos",k:"5",run:()=>showTab("planos")},
+ {n:"Ir para Calendário",k:"6",run:()=>showTab("cal")},
+ {n:"Ir para Wiki",k:"7",run:()=>showTab("wiki")},
+ {n:"Ir para Mídia",k:"8",run:()=>showTab("midia")},
+ {n:"Ir para Mapa",k:"9",run:()=>showTab("mapa")},
+ {n:"Plan finder — recomendar plano",run:()=>showTab("planos")},
+ {n:"Nova tarefa",k:"n",run:()=>{showTab("hoje");setTimeout(()=>$("quickAdd").focus(),60);}},
+ {n:"Atualizar Finanças (Gmail)",run:()=>{loaded.fin=0;showTab("fin");}},
+ {n:"Atualizar DevOps (Supabase/Vercel)",run:()=>{loaded.dev=0;showTab("dev");}},
+ {n:"Atualizar Leads (Zoho)",run:()=>loadLeads()},
+ {n:"Ver atalhos",k:"?",run:()=>openHelp()}
+];
+let cmdSel=0,cmdFiltered=[];
+function allCmds(){const dyn=load().filter(t=>t.status!=="done").map(t=>({n:"Tarefa › "+t.task,run:()=>openTaskById(t.id)}));return CMDS.concat(dyn);}
+function renderCmds(q){q=(q||"").toLowerCase();cmdFiltered=allCmds().filter(c=>c.n.toLowerCase().includes(q));cmdSel=0;const L=$("cmdkList");
+ L.innerHTML=cmdFiltered.slice(0,40).map((c,i)=>'<div class="cmdk-item'+(i===0?" sel":"")+'" data-i="'+i+'">'+escapeHtml(c.n)+(c.k?'<span class="k">'+c.k+'</span>':"")+'</div>').join("")||'<div class="cmdk-item">Nada encontrado</div>';
+ Array.from(L.querySelectorAll(".cmdk-item[data-i]")).forEach(el=>{el.onclick=()=>{const i=+el.dataset.i;if(cmdFiltered[i]){closePalette();cmdFiltered[i].run();}};});}
+function openPalette(){$("cmdk").hidden=false;const i=$("cmdkInput");i.value="";renderCmds("");setTimeout(()=>i.focus(),20);}
+function closePalette(){$("cmdk").hidden=true;}
+function moveSel(d){const items=$("cmdkList").querySelectorAll(".cmdk-item[data-i]");if(!items.length)return;items[cmdSel]&&items[cmdSel].classList.remove("sel");cmdSel=(cmdSel+d+items.length)%items.length;items[cmdSel].classList.add("sel");items[cmdSel].scrollIntoView({block:"nearest"});}
+function runSel(){if(cmdFiltered[cmdSel]){closePalette();cmdFiltered[cmdSel].run();}}
+function openTaskById(id){showTab("hoje");setTimeout(()=>{const c=document.querySelector('.taskc[data-tid="'+id+'"]');if(c){const b=c.querySelector(".taskbody");if(b&&b.hidden)c.querySelector(".ttl").click();c.scrollIntoView({block:"center"});}},70);}
+function openHelp(){$("help").hidden=false;}function closeHelp(){$("help").hidden=true;}
+$("cmdkBtn").onclick=openPalette;
+$("cmdkClose").onclick=closePalette;
+$("cmdk").addEventListener("click",e=>{if(e.target===$("cmdk"))closePalette();});
+$("help").addEventListener("click",e=>{if(e.target===$("help"))closeHelp();});
+$("cmdkInput").addEventListener("input",e=>renderCmds(e.target.value));
+$("helpClose").onclick=closeHelp;
+$("helpGrid").innerHTML=[["Ctrl/⌘ K","Command palette"],["1 – 8","Trocar de aba"],["n","Nova tarefa"],["?","Esta ajuda"],["Esc","Fechar"]].map(s=>'<div class="kk">'+s[0]+'</div><div>'+s[1]+'</div>').join("");
+document.addEventListener("keydown",e=>{
+ const tag=(e.target.tagName||"").toLowerCase(),typing=tag==="input"||tag==="textarea";
+ if((e.metaKey||e.ctrlKey)&&(e.key==="k"||e.key==="K")){e.preventDefault();$("cmdk").hidden?openPalette():closePalette();return;}
+ if(!$("cmdk").hidden){if(e.key==="Escape")closePalette();else if(e.key==="ArrowDown"){e.preventDefault();moveSel(1);}else if(e.key==="ArrowUp"){e.preventDefault();moveSel(-1);}else if(e.key==="Enter"){e.preventDefault();runSel();}return;}
+ if(!$("help").hidden){if(e.key==="Escape")closeHelp();return;}
+ if(typing)return;
+ if(e.key>="1"&&e.key<="9"){showTab(["hoje","fin","dev","apps","planos","cal","wiki","midia","mapa"][+e.key-1]);}
+ else if(e.key==="n"){showTab("hoje");setTimeout(()=>$("quickAdd").focus(),60);}
+ else if(e.key==="?"){openHelp();}
+});
+
+greet();seedTasks();render();buildRadar();loadLeads();loadBillsCard();loadHealth();
+</script>
+</body>
+</html>

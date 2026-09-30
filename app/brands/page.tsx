@@ -86,7 +86,7 @@ export default function BrandsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {brands.map((brand, index) => {
               const brandColor = brand.color || getColorForBrand(index)
-              const brandCode = brand.code || brand.slug.substring(0, 2).toUpperCase()
+              const brandCode = brand.slug.substring(0, 2).toUpperCase()
               return (
                 <Link key={brand.id} href={`/brands/${brand.slug.toLowerCase()}`}>
                   <Card className="h-56 flex flex-col justify-between hover:shadow-lg transition-all cursor-pointer overflow-hidden">

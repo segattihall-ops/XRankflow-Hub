@@ -1,299 +1,147 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { FileText, FolderKanban, CheckCircle2, Users, ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { AlertTriangle, ArrowRight, Building2, CheckSquare, FolderKanban, Plug, Sparkles } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { KPICard } from '@/components/ui/KPICard'
-import { supabase } from '@/lib/supabase'
-import { mockBrands, mockActivityLog } from '@/data/mockData'
-import type { TaskRecord, FinanceRecord } from '@/lib/supabase'
+import { supabase, type BrandRecord, type KPIRecord, type ProjectRecord, type TaskRecord } from '@/lib/supabase'
 
-const quickAccessItems = [
-  {
-    title: 'Finance Tracker',
-    description: 'Custos, assinaturas e receitas',
-    href: '/finance',
-    color: 'bg-green-600',
-  },
-  {
-    title: 'Projects & Tasks',
-    description: 'Execução diária e prioridades',
-    href: '/tasks',
-    color: 'bg-orange-600',
-  },
-  {
-    title: 'KPI Scorecard',
-    description: 'Métricas-chave e saúde dos projetos',
-    href: '/finance',
-    color: 'bg-blue-600',
-  },
-  {
-    title: 'Team Directory',
-    description: 'Pessoas, roles e delegações',
-    href: '/team',
-    color: 'bg-purple-600',
-  },
-  {
-    title: 'Brands',
-    description: 'Portfólio de marcas e workspaces',
-    href: '/brands',
-    color: 'bg-teal-600',
-  },
-  {
-    title: 'Activity Log',
-    description: 'Histórico de ações e mudanças',
-    href: '/activity',
-    color: 'bg-indigo-600',
-  },
-]
+type LoadState = 'loading' | 'ready' | 'error'
 
 export default function Home() {
   const [tasks, setTasks] = useState<TaskRecord[]>([])
-  const [finance, setFinance] = useState<FinanceRecord[]>([])
+  const [projects, setProjects] = useState<ProjectRecord[]>([])
+  const [brands, setBrands] = useState<BrandRecord[]>([])
+  const [kpis, setKpis] = useState<KPIRecord[]>([])
+  const [state, setState] = useState<LoadState>('loading')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [tasksRes, financeRes] = await Promise.all([
-          supabase.from('wh_tasks').select('*').limit(5),
-          supabase.from('wh_finance').select('*').limit(10),
-        ])
-
-        if (tasksRes.data) setTasks(tasksRes.data)
-        if (financeRes.data) setFinance(financeRes.data)
-      } catch (error) {
-        console.error('Error fetching data:', error)
+    const load = async () => {
+      const [taskRes, projectRes, brandRes, kpiRes] = await Promise.all([
+        supabase.from('wh_tasks').select('*').order('created_at', { ascending: false }),
+        supabase.from('wh_projects').select('*').order('created_at', { ascending: false }),
+        supabase.from('wh_brands').select('*').order('sort', { ascending: true }),
+        supabase.from('wh_kpis').select('*').order('created_at', { ascending: false }),
+      ])
+      const firstError = taskRes.error || projectRes.error || brandRes.error || kpiRes.error
+      if (firstError) {
+        setError(firstError.message)
+        setState('error')
+        return
       }
+      setTasks((taskRes.data || []) as TaskRecord[])
+      setProjects((projectRes.data || []) as ProjectRecord[])
+      setBrands((brandRes.data || []) as BrandRecord[])
+      setKpis((kpiRes.data || []) as KPIRecord[])
+      setState('ready')
     }
-
-    fetchData()
+    load()
   }, [])
 
-  const openTasks = tasks.filter(t => t.status !== 'Done').length
-  const totalExpenses = finance
-    .filter(f => f.type === 'Expense' && f.amount)
-    .reduce((sum, f) => sum + (f.amount || 0), 0)
+  const today = new Date().toISOString().slice(0, 10)
+  const overdue = useMemo(() => tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'Done'), [tasks, today])
+  const dueToday = useMemo(() => tasks.filter(t => t.due_date === today && t.status !== 'Done'), [tasks, today])
+  const highPriority = useMemo(() => tasks.filter(t => t.priority === 'High' && t.status !== 'Done'), [tasks])
+  const blocked = useMemo(() => tasks.filter(t => t.status === 'Parked' || t.status === 'Waiting'), [tasks])
+  const riskKpis = useMemo(() => kpis.filter(k => k.health === 'At Risk' || k.health === 'Off Track'), [kpis])
+
+  if (state === 'loading') {
+    return <div className="p-6 lg:p-10"><Card className="p-10 text-center text-slate-500">Carregando Command Center…</Card></div>
+  }
+
+  if (state === 'error') {
+    return (
+      <div className="p-6 lg:p-10 max-w-5xl">
+        <Card className="p-8 border-red-200">
+          <p className="font-bold text-red-700">Não foi possível carregar os dados operacionais.</p>
+          <p className="text-sm text-slate-500 mt-2">{error}</p>
+          <p className="text-sm text-slate-600 mt-4">Nenhum valor foi substituído por dados fictícios.</p>
+        </Card>
+      </div>
+    )
+  }
+
+  const attention = [...overdue, ...highPriority.filter(t => !overdue.some(o => o.id === t.id)), ...blocked.filter(t => !overdue.some(o => o.id === t.id))].slice(0, 8)
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      {/* Hero Section */}
-      <div
-        className="relative h-[500px] bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1200 600%22%3E%3Crect fill=%22%23111827%22 width=%221200%22 height=%22600%22/%3E%3C/svg%3E")',
-        }}
-      >
-        <div className="absolute inset-0 flex flex-col justify-between p-12">
-          <div>
-            <p className="text-sm uppercase tracking-widest text-teal-400 font-semibold mb-4">
-              XRANKFLOW MEDIA GROUP LLC
-            </p>
-            <h1 className="text-5xl font-bold text-white mb-6">XRMG Command Center</h1>
-            <p className="text-lg text-gray-300 max-w-2xl mb-8">
-              Welcome back, Segatti. Access brand workspaces, projects, finance and more — all
-              in one place.
-            </p>
-
-            {/* Navigation Buttons */}
-            <div className="flex gap-4 flex-wrap">
-              <Button
-                variant="ghost"
-                className="bg-black/40 text-white hover:bg-black/60"
-              >
-                Company Profile
-              </Button>
-              <Button
-                variant="ghost"
-                className="bg-black/40 text-white hover:bg-black/60"
-              >
-                Projects
-              </Button>
-              <Button
-                variant="ghost"
-                className="bg-black/40 text-white hover:bg-black/60"
-              >
-                SOPs
-              </Button>
-              <Button
-                variant="ghost"
-                className="bg-black/40 text-white hover:bg-black/60"
-              >
-                Team
-              </Button>
-              <Button
-                variant="ghost"
-                className="bg-black/40 text-white hover:bg-black/60"
-              >
-                Activity
-              </Button>
-            </div>
-          </div>
-
-          {/* Date/Time */}
-          <div className="text-gray-300 text-sm">
-            {new Date().toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </div>
+    <div className="p-4 sm:p-6 lg:p-10 max-w-screen-2xl mx-auto">
+      <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5 mb-8">
+        <div>
+          <p className="text-xs font-bold tracking-[0.18em] text-slate-500">CEO COMMAND CENTER</p>
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-950 mt-1">O que precisa da sua atenção</h1>
+          <p className="text-slate-500 mt-2">Somente dados atuais disponíveis nas fontes conectadas.</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/ai" className="px-4 py-2 rounded-lg bg-slate-950 text-white text-sm font-semibold flex items-center gap-2"><Sparkles size={16}/>Perguntar à IA</Link>
+          <Link href="/integrations" className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2"><Plug size={16}/>Integrações</Link>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="px-10 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <KPICard
-            label="Open Tasks"
-            value={openTasks}
-            icon={<FileText size={32} />}
-            color="purple"
-          />
-          <KPICard
-            label="Total Finance Items"
-            value={finance.length}
-            icon={<FolderKanban size={32} />}
-            color="blue"
-          />
-          <KPICard
-            label="Total Expenses"
-            value={`$${(totalExpenses / 1000).toFixed(1)}k`}
-            icon={<CheckCircle2 size={32} />}
-            color="green"
-          />
-          <KPICard
-            label="Subscriptions"
-            value={finance.filter(f => f.type === 'Subscription').length}
-            icon={<Users size={32} />}
-            color="orange"
-          />
-        </div>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <Metric label="Vencidas" value={overdue.length} tone={overdue.length ? 'danger' : 'normal'} />
+        <Metric label="Para hoje" value={dueToday.length} />
+        <Metric label="Alta prioridade" value={highPriority.length} tone={highPriority.length ? 'warning' : 'normal'} />
+        <Metric label="KPIs em risco" value={riskKpis.length} tone={riskKpis.length ? 'danger' : 'normal'} />
+      </div>
 
-        {/* Quick Access */}
-        <div className="mb-16">
-          <p className="section-label">QUICK ACCESS</p>
-          <h2 className="section-title mb-6">Operations Hub</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {quickAccessItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <Card className="h-48 flex flex-col justify-between hover:shadow-lg transition-all cursor-pointer overflow-hidden">
-                  <div
-                    className={`h-24 ${item.color} opacity-10 mb-4 -mx-6 -mt-6`}
-                  />
+      <div className="grid xl:grid-cols-3 gap-6">
+        <Card className="p-5 xl:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div><p className="text-xs font-bold tracking-wider text-slate-500">ATENÇÃO</p><h2 className="font-bold text-xl">Itens que exigem ação</h2></div>
+            <AlertTriangle size={20} className="text-amber-500"/>
+          </div>
+          {attention.length === 0 ? (
+            <p className="text-sm text-slate-500 py-8 text-center">Nenhum item crítico identificado nas tarefas conectadas.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {attention.map(task => (
+                <div key={task.id} className="py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                      {item.title}
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                      {item.description}
-                    </p>
+                    <p className="font-semibold">{task.title}</p>
+                    <p className="text-sm text-slate-500">{task.owner_role || 'Responsável não definido'}{task.due_date ? ` · prazo ${task.due_date}` : ''}</p>
                   </div>
-                  <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
-                    OPEN <ArrowRight size={16} className="ml-2" />
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Brand Workspaces */}
-        <div className="mb-16">
-          <div className="flex justify-between items-end mb-6">
-            <div>
-              <p className="section-label">PORTFOLIO</p>
-              <h2 className="section-title">Brand Workspaces</h2>
-            </div>
-            <Link href="/brands" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-              View all →
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockBrands.map((brand) => (
-              <Link key={brand.id} href={`/brands/${brand.code.toLowerCase()}`}>
-                <Card className="h-56 flex flex-col justify-between hover:shadow-lg transition-all cursor-pointer overflow-hidden">
-                  <div
-                    className="h-32 opacity-20 mb-4 -mx-6 -mt-6"
-                    style={{ backgroundColor: brand.color }}
-                  />
-                  <div>
-                    <div className="flex items-start gap-3 mb-3">
-                      <div
-                        className="w-10 h-10 rounded flex items-center justify-center text-white font-bold text-sm"
-                        style={{ backgroundColor: brand.color }}
-                      >
-                        {brand.code}
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                          {brand.name}
-                        </h3>
-                      </div>
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                      {brand.description}
-                    </p>
-                  </div>
-                  <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
-                    OPEN WORKSPACE <ArrowRight size={16} className="ml-2" />
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Activity Feed */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2"></div>
-
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
-            <p className="section-label">LIVE FEED</p>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              Company Updates
-            </h3>
-
-            <div className="space-y-4">
-              {mockActivityLog.map((entry) => (
-                <div key={entry.id} className="flex gap-3 pb-4 border-b border-gray-200 dark:border-gray-800 last:border-0">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                    style={{ backgroundColor: '#3b82f6' }}
-                  >
-                    {entry.user.avatar}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm">
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {entry.user.name}
-                      </span>
-                      <span className="text-gray-600 dark:text-gray-400"> {entry.action} </span>
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">
-                        {entry.resourceType}: {entry.resource}
-                      </span>
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      {entry.timestamp}
-                    </p>
+                  <div className="flex gap-2">
+                    <span className="text-xs bg-slate-100 rounded px-2 py-1">{task.status}</span>
+                    {task.priority && <span className="text-xs bg-amber-50 text-amber-700 rounded px-2 py-1">{task.priority}</span>}
                   </div>
                 </div>
               ))}
             </div>
+          )}
+        </Card>
 
-            <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-              <span className="font-semibold">One Team. Seven Brands.</span>
-              <br />
-              <span className="text-xs uppercase tracking-wider">Infinite Impact.</span>
-            </p>
+        <Card className="p-5">
+          <p className="text-xs font-bold tracking-wider text-slate-500">HOJE</p>
+          <h2 className="font-bold text-xl mb-4">Execução</h2>
+          <div className="space-y-3">
+            <Quick href="/tasks" icon={<CheckSquare size={18}/>} label="Tarefas" detail={`${tasks.length} registradas`} />
+            <Quick href="/projects" icon={<FolderKanban size={18}/>} label="Projetos" detail={`${projects.length} registrados`} />
+            <Quick href="/brands" icon={<Building2 size={18}/>} label="Empresas" detail={`${brands.length} conectadas ao Hub`} />
           </div>
-        </div>
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card className="p-5">
+          <div className="flex items-end justify-between mb-4">
+            <div><p className="text-xs font-bold tracking-wider text-slate-500">PORTFÓLIO</p><h2 className="font-bold text-xl">Empresas e produtos</h2></div>
+            <Link href="/brands" className="text-sm font-semibold flex items-center gap-1">Ver todos <ArrowRight size={15}/></Link>
+          </div>
+          {brands.length === 0 ? <p className="text-sm text-slate-500">Nenhuma empresa cadastrada na fonte atual.</p> :
+            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+              {brands.slice(0,8).map(b => <Link key={b.id} href={`/brands/${b.slug}`} className="border border-slate-200 rounded-xl p-4 hover:border-slate-400"><p className="font-bold">{b.name}</p><p className="text-sm text-slate-500 mt-1">{b.status || 'Status não informado'}</p></Link>)}
+            </div>}
+        </Card>
       </div>
     </div>
   )
+}
+
+function Metric({ label, value, tone='normal' }: { label:string; value:number; tone?:'normal'|'warning'|'danger' }) {
+  const cls = tone === 'danger' ? 'text-red-700' : tone === 'warning' ? 'text-amber-700' : 'text-slate-950'
+  return <Card className="p-5"><p className="text-xs font-bold tracking-wider text-slate-500">{label.toUpperCase()}</p><p className={`text-4xl font-black mt-2 ${cls}`}>{value}</p></Card>
+}
+function Quick({href,icon,label,detail}:{href:string;icon:ReactNode;label:string;detail:string}) {
+  return <Link href={href} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-400"><div>{icon}</div><div><p className="font-semibold text-sm">{label}</p><p className="text-xs text-slate-500">{detail}</p></div></Link>
 }
