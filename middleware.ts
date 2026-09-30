@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  let supabaseResponse = NextResponse.next({
+  const supabaseResponse = NextResponse.next({
     request,
   })
 
