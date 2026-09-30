@@ -5,7 +5,7 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
-  CircleAlert,
+  AlertCircle,
   Loader2,
   PauseCircle,
   PlayCircle,
@@ -323,7 +323,7 @@ export default function SocialMediaOSPage() {
 
         {error && (
           <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <CircleAlert size={18} className="mt-0.5 shrink-0" />
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
             <div className="flex-1">{error}</div>
             <button onClick={() => setError('')}><XCircle size={18} /></button>
           </div>
@@ -341,7 +341,7 @@ export default function SocialMediaOSPage() {
             ['Em revisão', stats.review, Sparkles],
             ['Aprovados', stats.approved, CheckCircle2],
             ['Agendados', stats.scheduled, CalendarDays],
-            ['Falhas', stats.failed, CircleAlert],
+            ['Falhas', stats.failed, AlertCircle],
           ] as const).map(([label, value, Icon]) => (
             <div key={String(label)} className={panel}>
               <Icon size={20} className="text-blue-600" />
