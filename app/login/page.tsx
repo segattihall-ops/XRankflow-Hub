@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
@@ -13,9 +15,13 @@ export default function LoginPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (user && !authLoading) {
+      router.push('/')
+      return
+    }
     setEmail(localStorage.getItem('saved_email') || '')
     setRememberMe(localStorage.getItem('remember_me') === 'true')
-  }, [])
+  }, [user, authLoading, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,6 +53,17 @@ export default function LoginPage() {
       setError(err instanceof Error ? err.message : 'An error occurred during login')
       setLoading(false)
     }
+  }
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
