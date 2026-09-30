@@ -337,12 +337,12 @@ export default function SocialMediaOSPage() {
         )}
 
         <div className="grid gap-4 md:grid-cols-4">
-          {[
+          {([
             ['Em revisão', stats.review, Sparkles],
             ['Aprovados', stats.approved, CheckCircle2],
             ['Agendados', stats.scheduled, CalendarDays],
             ['Falhas', stats.failed, CircleAlert],
-          ].map(([label, value, Icon]) => (
+          ] as const).map(([label, value, Icon]) => (
             <div key={String(label)} className={panel}>
               <Icon size={20} className="text-blue-600" />
               <div className="mt-3 text-2xl font-bold">{String(value)}</div>
