@@ -1,80 +1,16 @@
-'use client'
-
-import { Plus, Users } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 
-export default function CRMPage() {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="px-10 py-8">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <p className="section-label">SALES</p>
-            <h1 className="section-title mb-2">CRM & Pipeline</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Leads, clients, and partner pipeline across all brands
-            </p>
-          </div>
-          <Button>
-            <Plus size={20} />
-            Add Contact
-          </Button>
-        </div>
-
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {[
-            { label: 'Total Contacts', value: 0 },
-            { label: 'Leads', value: 0, color: 'orange' },
-            { label: 'Clients', value: 0, color: 'green' },
-            { label: 'Pipeline Value', value: '$0', color: 'blue' },
-          ].map((item) => (
-            <Card key={item.label}>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{item.label}</p>
-              <p className="text-5xl font-bold mt-2">{item.value}</p>
-            </Card>
-          ))}
-        </div>
-
-        {/* Pipeline Stages */}
-        <div className="mb-8">
-          <p className="section-label mb-4">PIPELINE STAGES</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'CLOSED WON', 'CLOSED LOST'].map(
-              (stage) => (
-                <Card key={stage} className="text-center">
-                  <p className="text-5xl font-bold text-gray-900 dark:text-white mb-2">0</p>
-                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                    {stage}
-                  </p>
-                  <p className="text-gray-400">—</p>
-                </Card>
-              )
-            )}
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex gap-4 mb-8">
-          {['All Brands', 'All Types', 'All Stages'].map((label) => (
-            <select key={label} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm">
-              <option>{label}</option>
-            </select>
-          ))}
-        </div>
-
-        {/* Empty State */}
-        <Card className="text-center py-16">
-          <Users size={64} className="mx-auto mb-4 text-gray-400" />
-          <p className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            No contacts yet
-          </p>
-          <p className="text-gray-600 dark:text-gray-400">
-            Click &quot;Add Contact&quot; to start building your pipeline
-          </p>
-        </Card>
-      </div>
+export default function CRMPage(){
+ return <div className="p-4 sm:p-6 lg:p-10 max-w-screen-xl mx-auto">
+  <p className="text-xs font-bold tracking-[0.18em] text-slate-500">REVENUE OPERATIONS</p>
+  <h1 className="text-3xl font-black mt-1">CRM Central</h1>
+  <p className="text-slate-500 mt-2 mb-8">Visão consolidada de leads, clientes, providers, parceiros e oportunidades — sem duplicar CRMs especializados.</p>
+  <Card className="p-8">
+    <p className="font-bold">Fonte ainda não conectada</p>
+    <p className="text-sm text-slate-500 mt-2">O XRANKFLOW OS não exibirá “0 leads” ou “$0 pipeline” como se fossem fatos. O CRM consolidado será habilitado após a definição e conexão das fontes autoritativas por empresa.</p>
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
+      {['Contatos','Leads','Clientes','Pipeline'].map(x=><div key={x} className="rounded-xl bg-slate-50 border border-slate-200 p-4"><p className="text-xs font-bold text-slate-500">{x.toUpperCase()}</p><p className="text-lg font-bold mt-2 text-slate-400">Não conectado</p></div>)}
     </div>
-  )
+  </Card>
+ </div>
 }
