@@ -13,6 +13,7 @@ import {
   BarChart3,
   LogOut,
   ShoppingBag,
+  Megaphone,
 } from 'lucide-react'
 
 const menuItems = [
@@ -32,6 +33,7 @@ const menuItems = [
       { name: 'CRM & Pipeline', href: '/crm', icon: PieChart },
       { name: 'Finance & KPIs', href: '/finance', icon: BarChart3 },
       { name: 'Team & People', href: '/team', icon: Users },
+      { name: 'Social Media OS', href: '/social-media', icon: Megaphone },
     ],
   },
   {
