@@ -15,3 +15,5 @@ dist/
 *.swo
 .turbo/
 .vercel/
+CLAUDE.md
+AGENTS.md

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { Sidebar } from './Sidebar'
 import { TopBanner } from './TopBanner'
@@ -10,9 +11,14 @@ import { Home, Inbox, CheckSquare, Bot, Menu } from 'lucide-react'
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const pathname = usePathname()
-  const isLoginPage = pathname === '/login'
+  const [isLoginPage, setIsLoginPage] = useState(false)
 
-  if (loading && !isLoginPage) {
+  useEffect(() => {
+    setIsLoginPage(pathname === '/login')
+  }, [pathname])
+
+  if (loading) {
+    if (isLoginPage) return children
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
