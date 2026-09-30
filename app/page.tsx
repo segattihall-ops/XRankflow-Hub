@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, ArrowRight, Building2, CheckSquare, FolderKanban, Plug, Sparkles } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { supabase, type BrandRecord, type KPIRecord, type ProjectRecord, type TaskRecord } from '@/lib/supabase'
@@ -142,6 +142,6 @@ function Metric({ label, value, tone='normal' }: { label:string; value:number; t
   const cls = tone === 'danger' ? 'text-red-700' : tone === 'warning' ? 'text-amber-700' : 'text-slate-950'
   return <Card className="p-5"><p className="text-xs font-bold tracking-wider text-slate-500">{label.toUpperCase()}</p><p className={`text-4xl font-black mt-2 ${cls}`}>{value}</p></Card>
 }
-function Quick({href,icon,label,detail}:{href:string;icon:React.ReactNode;label:string;detail:string}) {
+function Quick({href,icon,label,detail}:{href:string;icon:ReactNode;label:string;detail:string}) {
   return <Link href={href} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-400"><div>{icon}</div><div><p className="font-semibold text-sm">{label}</p><p className="text-xs text-slate-500">{detail}</p></div></Link>
 }
