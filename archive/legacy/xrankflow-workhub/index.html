@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XRankFlow Work Hub</title>
+<style>
+  :root{--bg:#0d1526;--panel:#131e33;--panel2:#182741;--line:#243657;--ink:#e8eefc;--muted:#8aa0c8;
+    --teal:#17c3b2;--blue:#4f8cff;--pink:#ff6fae;--orange:#ff9f45;--green:#37d67a;--red:#ff5d6c;--gray:#7c8db5}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+  button{font-family:inherit;cursor:pointer}
+  /* login */
+  #login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .lbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:34px;width:360px;text-align:center}
+  .lbox .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--teal),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:800;color:#04121a;font-size:22px;margin:0 auto 16px}
+  .lbox h2{font-size:19px;margin-bottom:4px}.lbox p{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .lbox input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:11px 12px;font-size:14px;margin-bottom:10px;outline:none}
+  .lbox button{width:100%;background:linear-gradient(135deg,var(--teal),var(--blue));color:#04121a;font-weight:800;border:none;border-radius:9px;padding:11px;font-size:14px}
+  .lmsg{font-size:12px;margin-top:12px;color:var(--muted)}
+  /* app */
+  header{display:flex;align-items:center;gap:12px;padding:11px 18px;background:linear-gradient(90deg,#0f1a2e,#12213c);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .logo-s{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--teal),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:800;color:#04121a}
+  header h1{font-size:15px}.tag{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 8px;border-radius:20px}
+  header .right{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+  header .right button{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:6px 10px;font-size:12px}
+  .layout{display:flex;min-height:calc(100vh - 52px)}
+  nav{width:210px;background:var(--panel);border-right:1px solid var(--line);padding:12px 9px;flex-shrink:0}
+  nav .grp{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:12px 8px 5px}
+  nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;color:var(--muted);cursor:pointer;font-weight:600;font-size:13px}
+  nav a:hover{background:var(--panel2);color:var(--ink)}
+  nav a.active{background:linear-gradient(90deg,rgba(23,195,178,.18),transparent);color:var(--ink);box-shadow:inset 2px 0 0 var(--teal)}
+  .dot{width:8px;height:8px;border-radius:50%}
+  main{flex:1;padding:20px 24px;overflow:auto}
+  .crumb{color:var(--muted);font-size:12px}.page-title{font-size:21px;font-weight:700}.page-sub{color:var(--muted);margin-bottom:18px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:13px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px}
+  .card .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}.card .v{font-size:25px;font-weight:800;margin-top:5px}.card .s{font-size:12px;color:var(--muted);margin-top:2px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:16px}
+  .panel .head{display:flex;align-items:center;margin-bottom:12px}.panel h3{font-size:14px}
+  .panel .head button{margin-left:auto;background:var(--teal);color:#04121a;font-weight:700;border:none;border-radius:8px;padding:7px 12px;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  td input,td select{width:100%;background:transparent;border:1px solid transparent;color:var(--ink);border-radius:6px;padding:5px 6px;font-size:13px;outline:none}
+  td input:focus,td select:focus{border-color:var(--line);background:var(--panel2)}
+  td select option{background:var(--panel2)}
+  .rowbtns{display:flex;gap:6px}
+  .rowbtns button{border:none;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700}
+  .save{background:var(--green)22;color:var(--green);background:rgba(55,214,122,.15)}
+  .del{background:rgba(255,93,108,.15);color:var(--red)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+  .muted{color:var(--muted)}.hidden{display:none}
+  .toast{position:fixed;bottom:18px;right:18px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 14px;font-size:13px;opacity:0;transition:.3s;z-index:50}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<!-- ===== LOGIN ===== -->
+<div id="login">
+  <div class="lbox">
+    <div class="logo">X</div>
+    <h2>XRankFlow Work Hub</h2>
+    <p>Cockpit operacional da holding. Entre com e-mail e senha.</p>
+    <input id="email" type="email" placeholder="admin@xrankflow.com" autocomplete="username">
+    <input id="password" type="password" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">Entrar</button>
+    <div class="lmsg" id="lmsg"></div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app" class="hidden">
+  <header>
+    <div class="logo-s">X</div><h1>XRankFlow</h1><span class="tag">Work Hub · Fase 1</span>
+    <div class="right"><span id="who"></span><button onclick="logout()">Sair</button></div>
+  </header>
+  <div class="layout">
+    <nav id="nav"></nav>
+    <main id="main"></main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPA_URL = 'https://njwqeulzythluenexdcw.supabase.co';
+const SUPA_KEY = 'sb_publishable_XbmJA9m7lSEywUBMbsQdSw_gsna1jqq';
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+let ORG=null, VOX=null, state={view:'hq'};
+const $=(s,el=document)=>el.querySelector(s);
+const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)};
+const money=n=>n==null||n===''?'—':'$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
+const COLOR=v=>({'In progress':'#4f8cff','Not started':'#7c8db5','In Progress':'#ff9f45','Next':'#4f8cff','Waiting':'#ff6fae','Inbox':'#7c8db5','Parked':'#7c8db5','Done':'#37d67a','Active':'#37d67a','Onboarding':'#4f8cff','Hiring':'#ff9f45','On Track':'#37d67a','At Risk':'#ff9f45','Off Track':'#ff5d6c','Not Started':'#7c8db5','High':'#ff5d6c','Medium':'#ff9f45','Low':'#4f8cff'}[v]||'#7c8db5');
+const pill=v=>v?`<span class="pill" style="background:${COLOR(v)}22;color:${COLOR(v)}">${v}</span>`:'—';
+window.login=login; window.logout=logout; window.go=go;
+
+/* ---------- AUTH ---------- */
+async function login(){
+  const email=$('#email').value.trim();
+  const password=$('#password').value;
+  if(!email||!password){$('#lmsg').textContent='Preencha e-mail e senha.';return}
+  $('#lmsg').textContent='Entrando…';
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error)$('#lmsg').textContent='Erro: '+error.message;
+}
+async function logout(){await sb.auth.signOut();location.reload()}
+async function boot(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){$('#login').classList.remove('hidden');$('#app').classList.add('hidden');return}
+  $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
+  $('#who').textContent=session.user.email;
+  const {data:org}=await sb.from('wh_organizations').select('*').eq('slug','xrmg').single();
+  ORG=org?.id;
+  const {data:vox}=await sb.from('wh_brands').select('*').eq('slug','voxmation').single();
+  VOX=vox?.id;
+  render();
+}
+sb.auth.onAuthStateChange(()=>boot());
+boot();
+
+/* ---------- NAV ---------- */
+function renderNav(){
+  const items=[['hq','Command Hub','#17c3b2','Corporativo'],['voxmation','Voxmation','#4f8cff','Marcas'],
+    ['finance','Finance','#37d67a','Shared Services'],['kpis','KPI Scorecard','#17c3b2'],
+    ['tasks','Projects & Tasks','#ff9f45'],['people','Team Directory','#4f8cff']];
+  let html='',lastGrp='';
+  items.forEach(([id,label,c,grp])=>{
+    if(grp&&grp!==lastGrp){html+=`<div class="grp">${grp}</div>`;lastGrp=grp}
+    html+=`<a class="${state.view===id?'active':''}" onclick="go('${id}')"><span class="dot" style="background:${c}"></span>${label}</a>`;
+  });
+  $('#nav').innerHTML=html;
+}
+function go(v){state.view=v;render()}
+
+/* ---------- EDITABLE GRID ---------- */
+const MODULES={
+  finance:{table:'wh_finance',title:'Finance Tracker',sub:'Custos, assinaturas e receitas.',
+    cols:[{k:'item',t:'text',w:'22%'},{k:'type',t:'sel',o:['Subscription','Expense','Invoice','Revenue','Tax / Compliance']},
+      {k:'amount',t:'num'},{k:'frequency',t:'sel',o:['Monthly','Yearly','One-time']},
+      {k:'status',t:'sel',o:['In progress','Not started','Done']},{k:'notes',t:'text',w:'28%'}]},
+  kpis:{table:'wh_kpis',title:'KPI Scorecard',sub:'Métricas-chave.',
+    cols:[{k:'metric',t:'text',w:'26%'},{k:'owner_role',t:'sel',o:['CEO','SDR','VA','EA']},
+      {k:'target',t:'num'},{k:'actual',t:'num'},{k:'health',t:'sel',o:['On Track','At Risk','Off Track','Not Started']},
+      {k:'period',t:'sel',o:['Weekly','Monthly']}]},
+  tasks:{table:'wh_tasks',title:'Projects & Tasks',sub:'Execução diária.',
+    cols:[{k:'title',t:'text',w:'30%'},{k:'area',t:'text'},{k:'owner_role',t:'sel',o:['CEO','SDR','VA','Developer','Designer','Contractor']},
+      {k:'priority',t:'sel',o:['High','Medium','Low']},{k:'status',t:'sel',o:['Inbox','Next','In Progress','Waiting','Done','Parked']},{k:'notes',t:'text',w:'24%'}]},
+  people:{table:'wh_people',title:'Team Directory',sub:'Pessoas e delegação.',
+    cols:[{k:'name',t:'text'},{k:'role',t:'sel',o:['CEO','SDR','VA','EA','Contractor']},
+      {k:'status',t:'sel',o:['Active','Onboarding','Hiring','Inactive']},{k:'brand_focus',t:'text'},
+      {k:'contact',t:'text'},{k:'responsibilities',t:'text',w:'30%'}]}
+};
+
+async function grid(modKey,filterBrand){
+  const m=MODULES[modKey];
+  let q=sb.from(m.table).select('*').order('created_at');
+  if(filterBrand)q=q.eq('brand_id',VOX);
+  const {data,error}=await q;
+  if(error){$('#main').innerHTML=`<div class="panel">Erro: ${error.message}</div>`;return}
+  const head=m.cols.map(c=>`<th style="${c.w?`width:${c.w}`:''}">${c.k.replace('_',' ')}</th>`).join('')+'<th></th>';
+  const rowHtml=r=>`<tr data-id="${r.id}">`+m.cols.map(c=>cell(c,r[c.k])).join('')+
+    `<td><div class="rowbtns"><button class="save" onclick="saveRow('${m.table}','${r.id}',this)">Salvar</button><button class="del" onclick="delRow('${m.table}','${r.id}',this)">✕</button></div></td></tr>`;
+  $('#main').innerHTML=`
+    <div class="crumb">Shared Services</div><div class="page-title">${m.title}</div><div class="page-sub">${m.sub} · ${data.length} registros${filterBrand?' · filtro: Voxmation':''}</div>
+    <div class="panel"><div class="head"><h3>${m.title}</h3><button onclick="addRow('${modKey}',${filterBrand?true:false})">+ Novo</button></div>
+      <table><thead><tr>${head}</tr></thead><tbody id="tb">${data.map(rowHtml).join('')}</tbody></table></div>`;
+}
+function cell(c,val){
+  if(c.t==='sel'){const opts=['',...c.o].map(o=>`<option ${o===(val||'')?'selected':''}>${o}</option>`).join('');
+    return `<td><select data-k="${c.k}">${opts}</select></td>`}
+  const type=c.t==='num'?'number':'text';
+  return `<td><input data-k="${c.k}" type="${type}" value="${val==null?'':String(val).replace(/"/g,'&quot;')}"></td>`;
+}
+function collect(tr){const o={};tr.querySelectorAll('[data-k]').forEach(el=>{let v=el.value;if(el.type==='number')v=v===''?null:Number(v);o[el.dataset.k]=v===''?null:v});return o}
+window.saveRow=async(table,id,btn)=>{const tr=btn.closest('tr');const {error}=await sb.from(table).update(collect(tr)).eq('id',id);toast(error?('Erro: '+error.message):'Salvo ✓')};
+window.delRow=async(table,id,btn)=>{if(!confirm('Excluir este registro?'))return;const {error}=await sb.from(table).delete().eq('id',id);if(error)return toast('Erro: '+error.message);btn.closest('tr').remove();toast('Excluído')};
+window.addRow=async(modKey,brand)=>{const m=MODULES[modKey];const rec={org_id:ORG};if(brand)rec.brand_id=VOX;
+  const first=m.cols[0].k;rec[first]='(novo)';const {error}=await sb.from(m.table).insert(rec);if(error)return toast('Erro: '+error.message);toast('Adicionado');render()};
+window.grid=grid;
+
+/* ---------- DASHBOARD VIEWS ---------- */
+async function hq(){
+  const [{data:fin},{data:tasks},{data:kpi},{data:brands}]=await Promise.all([
+    sb.from('wh_finance').select('*'),sb.from('wh_tasks').select('*'),
+    sb.from('wh_kpis').select('*'),sb.from('wh_brands').select('*')]);
+  const monthly=(fin||[]).filter(f=>f.frequency==='Monthly'&&f.amount).reduce((a,f)=>a+Number(f.amount),0);
+  const open=(tasks||[]).filter(t=>t.status!=='Done').length;
+  const high=(tasks||[]).filter(t=>t.priority==='High'&&t.status!=='Done');
+  const risk=(kpi||[]).filter(k=>k.health==='Off Track'||k.health==='At Risk').length;
+  $('#main').innerHTML=`
+   <div class="crumb">XRankFlow Media Group</div><div class="page-title">Command Hub</div>
+   <div class="page-sub">Fase 1 · holding + Voxmation · edição ao vivo (Supabase).</div>
+   <div class="cards">
+     <div class="card"><div class="k">Marcas</div><div class="v">${(brands||[]).length}</div><div class="s">Voxmation ativa (Fase 1)</div></div>
+     <div class="card"><div class="k">Custo mensal conhecido</div><div class="v">${money(monthly)}</div><div class="s">${(fin||[]).filter(f=>f.amount==null).length} itens sem valor</div></div>
+     <div class="card"><div class="k">Tarefas abertas</div><div class="v">${open}</div><div class="s">${high.length} de alta prioridade</div></div>
+     <div class="card"><div class="k">KPIs em risco</div><div class="v" style="color:var(--red)">${risk}</div><div class="s">de ${(kpi||[]).length} métricas</div></div>
+   </div>
+   <div class="panel"><div class="head"><h3>⚠️ Alta prioridade agora</h3></div>
+     ${high.slice(0,8).map(t=>`<div style="padding:7px 0;border-bottom:1px solid var(--line)">${pill(t.priority)} ${t.title} <span class="muted">· ${t.owner_role||''} · ${pill(t.status)}</span></div>`).join('')||'<span class="muted">Nada.</span>'}</div>
+   <div class="panel"><div class="head"><h3>🎯 KPIs</h3></div>
+     ${(kpi||[]).map(k=>`<div style="display:flex;justify-content:space-between;padding:6px 0"><span>${k.metric}</span>${pill(k.health)}</div>`).join('')}</div>`;
+}
+async function voxmation(){
+  const [{data:fin},{data:kpi}]=await Promise.all([
+    sb.from('wh_finance').select('*').eq('brand_id',VOX),
+    sb.from('wh_kpis').select('*').eq('brand_id',VOX)]);
+  const monthly=(fin||[]).filter(f=>f.frequency==='Monthly'&&f.amount).reduce((a,f)=>a+Number(f.amount),0);
+  $('#main').innerHTML=`
+   <div class="crumb">Marcas / Voxmation</div><div class="page-title"><span class="dot" style="background:var(--blue);display:inline-block"></span> Voxmation</div>
+   <div class="page-sub">AI voice automation. Dados filtrados por marca. Edite em Finance/KPIs/Tasks.</div>
+   <div class="cards">
+     <div class="card"><div class="k">Status</div><div class="v" style="font-size:17px">Ativo</div></div>
+     <div class="card"><div class="k">Itens financeiros</div><div class="v">${(fin||[]).length}</div><div class="s">${money(monthly)}/mês conhecido</div></div>
+     <div class="card"><div class="k">KPIs</div><div class="v">${(kpi||[]).length}</div></div>
+   </div>
+   <div class="panel"><div class="head"><h3>🎯 KPIs Voxmation</h3></div><table><thead><tr><th>Metric</th><th>Owner</th><th>Target</th><th>Actual</th><th>Health</th><th>Period</th></tr></thead><tbody>
+     ${(kpi||[]).map(k=>`<tr><td>${k.metric}</td><td>${k.owner_role||''}</td><td>${k.target??'—'}</td><td>${k.actual??'—'}</td><td>${pill(k.health)}</td><td>${k.period||''}</td></tr>`).join('')}</tbody></table></div>
+   <div class="panel"><div class="head"><h3>💰 Custos Voxmation</h3></div><table><thead><tr><th>Item</th><th>Amount</th><th>Freq</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+     ${(fin||[]).map(f=>`<tr><td>${f.item}</td><td>${money(f.amount)}</td><td>${f.frequency||''}</td><td>${pill(f.status)}</td><td class="muted">${f.notes||''}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- ROUTER ---------- */
+async function render(){
+  renderNav();
+  const v=state.view;
+  if(v==='hq')return hq();
+  if(v==='voxmation')return voxmation();
+  if(v==='finance')return grid('finance');
+  if(v==='kpis')return grid('kpis');
+  if(v==='tasks')return grid('tasks');
+  if(v==='people')return grid('people');
+}
+</script>
+</body>
+</html>
