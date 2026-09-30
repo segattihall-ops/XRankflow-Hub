@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { Sidebar } from './Sidebar'
 import { TopBanner } from './TopBanner'
@@ -11,11 +11,12 @@ import { Home, Inbox, CheckSquare, Bot, Menu } from 'lucide-react'
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const pathname = usePathname()
-  const [isLoginPage, setIsLoginPage] = useState(false)
+  const router = useRouter()
+  const isLoginPage = pathname === '/login'
 
   useEffect(() => {
-    setIsLoginPage(pathname === '/login')
-  }, [pathname])
+    if (!loading && !user && !isLoginPage) router.replace('/login')
+  }, [isLoginPage, loading, router, user])
 
   if (loading) {
     if (isLoginPage) return children
@@ -30,15 +31,14 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!user && isLoginPage) return children
-  if (!user) return null
+  if (!user) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><p className="text-sm text-slate-500">Redirecionando para login…</p></div>
+  if (isLoginPage) return children
 
   return (
     <>
       <TopBanner />
       <Sidebar />
-      <main className="min-h-screen bg-slate-50 lg:ml-72 pb-20 lg:pb-0">
-        {children}
-      </main>
+      <main className="min-h-screen bg-slate-50 lg:ml-72 pb-20 lg:pb-0">{children}</main>
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 grid grid-cols-5">
         <Link href="/" className="flex flex-col items-center py-2 text-[10px] text-slate-700"><Home size={19}/><span>Hoje</span></Link>
         <Link href="/inbox" className="flex flex-col items-center py-2 text-[10px] text-slate-700"><Inbox size={19}/><span>Inbox</span></Link>

@@ -26,6 +26,7 @@ const sections = [
       { name: 'CRM', href: '/crm', icon: Users },
       { name: 'Financeiro', href: '/finance', icon: DollarSign },
       { name: 'Marketing', href: '/marketing', icon: Megaphone },
+      { name: 'Social Media OS', href: '/social-media', icon: Megaphone },
       { name: 'Automações', href: '/automations', icon: Workflow },
       { name: 'Saúde do Sistema', href: '/health', icon: HeartPulse },
     ],
