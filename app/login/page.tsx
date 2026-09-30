@@ -1,39 +1,75 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (user && !authLoading) {
+      router.push('/')
+      return
+    }
+    setEmail(localStorage.getItem('saved_email') || '')
+    setRememberMe(localStorage.getItem('remember_me') === 'true')
+  }, [user, authLoading, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else {
+        if (rememberMe) {
+          localStorage.setItem('saved_email', email)
+          localStorage.setItem('remember_me', 'true')
+        } else {
+          localStorage.removeItem('saved_email')
+          localStorage.removeItem('remember_me')
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+        router.refresh()
+        router.push('/')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during login')
       setLoading(false)
-    } else {
-      router.push('/')
-      router.refresh()
     }
   }
 
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl p-8">
+        <div className="bg-white rounded-lg shadow-lg p-8 border border-gray-200">
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-2xl">
@@ -42,16 +78,16 @@ export default function LoginPage() {
           </div>
 
           {/* Title */}
-          <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl font-bold text-center text-gray-900 mb-2">
             XRANKFLOW Hub
           </h1>
-          <p className="text-center text-gray-600 dark:text-gray-400 text-sm mb-8">
+          <p className="text-center text-gray-600 text-sm mb-8">
             Command Center para a holding. Entre com suas credenciais.
           </p>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 rounded-lg text-sm">
+            <div className="mb-6 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -59,7 +95,7 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email
               </label>
               <input
@@ -67,13 +103,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@xrankflow.com"
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Senha
               </label>
               <input
@@ -81,9 +117,22 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 required
               />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-600"
+              />
+              <label htmlFor="remember" className="ml-2 text-sm font-medium text-gray-700">
+                Lembrar-se de mim
+              </label>
             </div>
 
             <button
@@ -96,13 +145,13 @@ export default function LoginPage() {
           </form>
 
           {/* Help Text */}
-          <p className="text-center text-xs text-gray-500 dark:text-gray-500 mt-6">
+          <p className="text-center text-xs text-gray-500 mt-6">
             Use suas credenciais do Supabase para acessar o Command Center
           </p>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-300 dark:text-gray-600 mt-8">
+        <p className="text-center text-sm text-gray-500 mt-8">
           XRankFlow Media Group LLC © 2026
         </p>
       </div>
