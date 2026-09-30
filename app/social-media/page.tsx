@@ -14,9 +14,11 @@ import {
   Send,
   Sparkles,
   XCircle,
+  Layers,
+  ExternalLink,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { buildMultichannelPack, type Brand, type ContentItem } from '@/lib/social-media-os'
+import { buildMultichannelPack, buildTemplatePlan, type Brand, type ContentItem, type SocialTemplate } from '@/lib/social-media-os'
 
 type Campaign = {
   id: string
@@ -63,6 +65,7 @@ export default function SocialMediaOSPage() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [facts, setFacts] = useState<Fact[]>([])
+  const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -77,14 +80,15 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_accounts').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_brand_facts').select('id,brand_id,fact_text,status').order('created_at', { ascending: false }),
+      supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -96,6 +100,7 @@ export default function SocialMediaOSPage() {
     setContent((contentRes.data ?? []) as ContentItem[])
     setAccounts((accountsRes.data ?? []) as Account[])
     setFacts((factsRes.data ?? []) as Fact[])
+    setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
   }, [])
@@ -115,6 +120,14 @@ export default function SocialMediaOSPage() {
   const filteredAccounts = useMemo(
     () => accounts.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [accounts, selectedBrandId],
+  )
+  const filteredTemplates = useMemo(
+    () => templates.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [templates, selectedBrandId],
+  )
+  const templateById = useMemo(
+    () => new Map(templates.map((template) => [template.id, template])),
+    [templates],
   )
 
   async function createBrand(event: FormEvent<HTMLFormElement>) {
@@ -209,35 +222,101 @@ export default function SocialMediaOSPage() {
     })
     const base = Date.now().toString(36).toUpperCase()
     setBusy(true)
-    const rows = drafts.map((draft, index) => ({
-      brand_id: selectedBrand.id,
-      campaign_id: campaignId,
-      code: `${selectedBrand.code_prefix}-${base}-${index + 1}`,
-      audience: audience || null,
-      objective: objective || null,
-      theme: topic,
-      platform: draft.platform,
-      format: draft.format,
-      language: selectedBrand.languages[0] || 'en',
-      caption: draft.caption,
-      cta: cta || null,
-      url: selectedBrand.website || null,
-      final_url: selectedBrand.website || null,
-      art_text: draft.artText || null,
-      alt_text: draft.altText || null,
-      script: draft.script || null,
-      sources: approvedFacts.map((fact) => ({ type: 'approved_fact', fact })),
-      status: 'em_revisao',
-      production_status: draft.format === 'video_curto' ? 'production_required' : 'draft',
-      payload: draft.payload,
-      timezone: selectedBrand.timezone || 'America/Chicago',
-      validation: draft.platform === 'x' ? { thread_validated: true } : {},
-    }))
+    const language = selectedBrand.languages[0] || 'en'
+    const brandTemplates = templates.filter((template) => template.brand_id === selectedBrand.id)
+    const rows = drafts.map((draft, index) => {
+      const templatePlan = buildTemplatePlan(
+        brandTemplates,
+        draft,
+        selectedBrand,
+        language,
+        audience,
+        objective,
+      )
+      const primaryTemplate = templatePlan[0]
+      return {
+        brand_id: selectedBrand.id,
+        campaign_id: campaignId,
+        code: `${selectedBrand.code_prefix}-${base}-${index + 1}`,
+        audience: audience || null,
+        objective: objective || null,
+        theme: topic,
+        platform: draft.platform,
+        format: draft.format,
+        language,
+        caption: draft.caption,
+        cta: cta || null,
+        url: selectedBrand.website || null,
+        final_url: selectedBrand.website || null,
+        art_text: draft.artText || null,
+        alt_text: draft.altText || null,
+        script: draft.script || null,
+        sources: approvedFacts.map((fact) => ({ type: 'approved_fact', fact })),
+        status: 'em_revisao',
+        production_status: draft.format === 'video_curto'
+          ? 'production_required'
+          : primaryTemplate
+            ? 'template_assigned'
+            : 'draft',
+        payload: { ...draft.payload, template_plan: templatePlan },
+        timezone: selectedBrand.timezone || 'America/Chicago',
+        validation: draft.platform === 'x' ? { thread_validated: true } : {},
+        template_id: primaryTemplate?.template_id || null,
+        template_status: primaryTemplate
+          ? (primaryTemplate.capability === 'autofill' ? 'autofill_ready' : 'assigned')
+          : 'unassigned',
+        creative_provider: primaryTemplate?.provider || null,
+      }
+    })
     const { error: insertError } = await supabase.from('sm_content').insert(rows)
     setBusy(false)
     if (insertError) setError(insertError.message)
     else {
       setNotice(`${rows.length} peças multicanal criadas e enviadas para revisão.`)
+      event.currentTarget.reset()
+      await loadAll()
+    }
+  }
+
+  async function registerTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedBrandId) return
+    const form = new FormData(event.currentTarget)
+    const name = String(form.get('template_name') || '').trim()
+    const designId = String(form.get('design_id') || '').trim()
+    const pageNumber = Number(form.get('page_number') || 1)
+    const format = String(form.get('template_format') || 'post_estatico').trim()
+    const platform = String(form.get('template_platform') || 'instagram').trim()
+    const language = String(form.get('template_language') || '').trim()
+    const viewUrl = String(form.get('view_url') || '').trim()
+    const editUrl = String(form.get('edit_url') || '').trim()
+    if (!name || !designId || !pageNumber) return
+
+    setBusy(true)
+    const { error: insertError } = await supabase.from('sm_templates').insert({
+      brand_id: selectedBrandId,
+      name,
+      provider: 'canva',
+      source_type: 'design_page',
+      source_design_id: designId,
+      source_page_number: pageNumber,
+      platforms: [platform],
+      formats: [format],
+      language_tags: language ? [language] : [],
+      audience_tags: [],
+      objective_tags: [],
+      field_schema: {},
+      selection_rules: { preserve_master: true },
+      capability: 'copy_manual',
+      priority: 100,
+      status: 'active',
+      source_view_url: viewUrl || null,
+      source_edit_url: editUrl || null,
+    })
+    setBusy(false)
+    if (insertError) setError(insertError.message)
+    else {
+      setNotice('Template cadastrado. O original será tratado como master e não será sobrescrito.')
       event.currentTarget.reset()
       await loadAll()
     }
