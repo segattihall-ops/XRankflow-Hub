@@ -322,6 +322,62 @@ export default function SocialMediaOSPage() {
     }
   }
 
+  async function prepareCreative(item: ContentItem) {
+    if (!item.template_id) {
+      setError('Nenhum template foi atribuído a este conteúdo.')
+      return
+    }
+    const template = templateById.get(item.template_id)
+    if (!template) {
+      setError('Template atribuído não foi encontrado na biblioteca.')
+      return
+    }
+
+    setBusy(true)
+    const { data: userData } = await supabase.auth.getUser()
+    const templatePlan = Array.isArray(item.payload.template_plan)
+      ? item.payload.template_plan
+      : []
+    const { error: renderError } = await supabase.from('sm_template_renders').insert({
+      brand_id: item.brand_id,
+      content_id: item.id,
+      template_id: item.template_id,
+      provider: template.provider,
+      status: template.capability === 'autofill' ? 'queued' : 'manual_edit_required',
+      payload: {
+        template_plan: templatePlan,
+        preserve_master: true,
+        source_design_id: template.source_design_id,
+        source_page_number: template.source_page_number,
+      },
+      created_by: userData.user?.email || 'authenticated-user',
+    })
+    const { error: updateError } = await supabase
+      .from('sm_content')
+      .update({
+        template_status: template.capability === 'autofill' ? 'render_queued' : 'manual_edit_required',
+        production_status: template.capability === 'autofill' ? 'render_queued' : 'template_ready',
+      })
+      .eq('id', item.id)
+
+    setBusy(false)
+    if (renderError && !renderError.message.includes('duplicate')) {
+      setError(renderError.message)
+      return
+    }
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+
+    setNotice(
+      template.capability === 'autofill'
+        ? 'Render Canva enfileirado.'
+        : 'Template preparado. Como este master ainda não possui campos Autofill, o OS preserva o original e deixa a arte pronta para cópia/edição no Canva.',
+    )
+    await loadAll()
+  }
+
   async function updateStatus(item: ContentItem, status: string) {
     setBusy(true)
     const patch: Record<string, unknown> = { status }
@@ -473,7 +529,7 @@ export default function SocialMediaOSPage() {
           <section className={panel}>
             <h2 className="text-lg font-bold">Gerar pacote multicanal</h2>
             <p className="mt-1 text-xs text-gray-500">
-              Usa configuração da marca e somente fatos aprovados. Vídeos ficam marcados como produção pendente.
+              Usa configuração da marca, fatos aprovados e escolhe automaticamente um layout compatível da biblioteca.
             </p>
             <form onSubmit={generatePack} className="mt-4 grid gap-3 md:grid-cols-2">
               <input className={input} name="topic" placeholder="Tema" required />
@@ -502,6 +558,85 @@ export default function SocialMediaOSPage() {
         </div>
 
         <section className={panel}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Layers size={18} className="text-blue-600" />
+                <h2 className="text-lg font-bold">Biblioteca de templates</h2>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                O motor escolhe automaticamente por plataforma, formato, proporção, idioma, público e objetivo.
+              </p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              {filteredTemplates.filter((template) => template.status === 'active').length} ativos
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {filteredTemplates.slice(0, 12).map((template) => (
+              <div key={template.id} className="rounded-xl border border-gray-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{template.name}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {template.aspect_ratio || 'custom'} · {template.platforms.join(', ') || 'reference'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium">
+                    {template.capability === 'autofill' ? 'Autofill' : 'Copy/Edit'}
+                  </span>
+                </div>
+                <p className="mt-3 text-xs text-gray-500">
+                  {template.source_page_number ? `Página ${template.source_page_number}` : 'Brand Template'} · {template.formats.join(', ') || 'referência'}
+                </p>
+                {template.source_view_url && (
+                  <a
+                    href={template.source_view_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+                  >
+                    Abrir master no Canva <ExternalLink size={13} />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <details className="mt-5 border-t pt-4">
+            <summary className="cursor-pointer text-sm font-semibold">Adicionar outro template Canva</summary>
+            <form onSubmit={registerTemplate} className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <input className={input} name="template_name" placeholder="Nome do template" required />
+              <input className={input} name="design_id" placeholder="Canva Design ID" required />
+              <input className={input} name="page_number" type="number" min="1" defaultValue="1" required />
+              <select className={input} name="template_platform" defaultValue="instagram">
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="x">X</option>
+                <option value="tiktok">TikTok</option>
+              </select>
+              <select className={input} name="template_format" defaultValue="post_estatico">
+                <option value="post_estatico">Post estático</option>
+                <option value="carrossel">Carrossel</option>
+                <option value="story">Story</option>
+                <option value="video_curto">Vídeo curto</option>
+              </select>
+              <input className={input} name="template_language" placeholder="Idioma (en, pt...)" />
+              <input className={input} name="view_url" placeholder="Canva view URL" />
+              <input className={input} name="edit_url" placeholder="Canva edit URL" />
+              <button
+                disabled={busy || !selectedBrand}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 md:col-span-2 lg:col-span-4"
+              >
+                Cadastrar template
+              </button>
+            </form>
+          </details>
+        </section>
+
+        <section className={panel}>
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-bold">Biblioteca e aprovação</h2>
@@ -526,10 +661,26 @@ export default function SocialMediaOSPage() {
                         <span className="text-gray-400">v{item.version}</span>
                       </div>
                       <h3 className="mt-3 font-semibold">{item.theme || item.code}</h3>
+                      {item.template_id && templateById.get(item.template_id) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-full bg-violet-50 px-2 py-1 font-medium text-violet-700">
+                            Template: {templateById.get(item.template_id)?.name}
+                          </span>
+                          <span className="text-gray-400">{item.template_status || 'assigned'}</span>
+                        </div>
+                      )}
                       <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{item.caption || 'Sem legenda'}</p>
                       {item.scheduled_for && <p className="mt-2 text-xs text-gray-500">Agendado: {new Date(item.scheduled_for).toLocaleString()}</p>}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
+                      {item.template_id && (
+                        <button
+                          onClick={() => void prepareCreative(item)}
+                          className="flex items-center gap-1 rounded-lg border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700"
+                        >
+                          <Layers size={14} /> Preparar arte
+                        </button>
+                      )}
                       {item.status === 'em_revisao' && (
                         <>
                           <button onClick={() => void updateStatus(item, 'aprovado')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Aprovar</button>
@@ -576,6 +727,8 @@ export default function SocialMediaOSPage() {
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between"><span>Base multimarcas + RLS</span><b className="text-emerald-700">Ativa</b></div>
               <div className="flex justify-between"><span>Geração multicanal determinística</span><b className="text-emerald-700">Ativa</b></div>
+              <div className="flex justify-between"><span>Seleção automática de templates</span><b className="text-emerald-700">Ativa</b></div>
+              <div className="flex justify-between"><span>Canva master library</span><b className="text-emerald-700">{filteredTemplates.length ? 'Conectada' : 'Sem templates'}</b></div>
               <div className="flex justify-between"><span>Aprovação e agendamento</span><b className="text-emerald-700">Ativos</b></div>
               <div className="flex justify-between"><span>Publicação externa</span><b className="text-amber-700">Aguardando integrador conectado</b></div>
               <div className="flex justify-between"><span>Pesquisa externa automática</span><b className="text-amber-700">Aguardando provedor autorizado</b></div>
