@@ -1,26 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('saved_email') || ''
-    }
-    return ''
-  })
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('remember_me') === 'true'
-    }
-    return false
-  })
+  const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setEmail(localStorage.getItem('saved_email') || '')
+    setRememberMe(localStorage.getItem('remember_me') === 'true')
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
