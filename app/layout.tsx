@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { AuthProvider } from '@/lib/auth-context'
-import { ProtectedLayout } from '@/components/layout/ProtectedLayout'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,9 +16,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className="light">
       <body className="bg-white text-gray-900">
         <AuthProvider>
-          <ProtectedLayout>
-            {children}
-          </ProtectedLayout>
+          {children}
         </AuthProvider>
       </body>
     </html>
