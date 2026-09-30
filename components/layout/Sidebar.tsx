@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   Home, Inbox, FolderKanban, CheckSquare, CalendarDays, Building2, Users,
   DollarSign, Megaphone, Workflow, HeartPulse, Bot, Search, Plug, ShieldCheck,
-  BarChart3, FileText, Settings
+  BarChart3, FileText, Settings, BookOpen, Gavel, AlertOctagon, ClipboardCheck
 } from 'lucide-react'
 
 const sections = [
@@ -34,6 +34,9 @@ const sections = [
     label: 'INTELIGÊNCIA',
     items: [
       { name: 'AI Command Center', href: '/ai', icon: Bot },
+      { name: 'Conhecimento', href: '/knowledge', icon: BookOpen },
+      { name: 'Decisões', href: '/decisions', icon: Gavel },
+      { name: 'Riscos', href: '/risks', icon: AlertOctagon },
       { name: 'Busca Global', href: '/search', icon: Search },
       { name: 'Analytics', href: '/analytics', icon: BarChart3 },
       { name: 'Relatórios', href: '/reports', icon: FileText },
@@ -42,6 +45,7 @@ const sections = [
   {
     label: 'ADMINISTRAÇÃO',
     items: [
+      { name: 'Aprovações', href: '/approvals', icon: ClipboardCheck },
       { name: 'Integrações', href: '/integrations', icon: Plug },
       { name: 'Pessoas & Acessos', href: '/team', icon: ShieldCheck },
       { name: 'Configurações', href: '/settings', icon: Settings },
