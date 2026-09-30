@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Sidebar } from './Sidebar'
 import { TopBanner } from './TopBanner'
@@ -8,8 +9,10 @@ import { Home, Inbox, CheckSquare, Bot, Menu } from 'lucide-react'
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const pathname = usePathname()
+  const isLoginPage = pathname === '/login'
 
-  if (loading) {
+  if (loading && !isLoginPage) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -20,6 +23,7 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     )
   }
 
+  if (!user && isLoginPage) return children
   if (!user) return null
 
   return (
