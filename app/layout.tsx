@@ -14,8 +14,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="bg-primary-light dark:bg-gray-950">
+    <html lang="en" suppressHydrationWarning className="light">
+      <body className="bg-white text-gray-900">
         <AuthProvider>
           <ProtectedLayout>
             {children}
