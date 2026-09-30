@@ -1,137 +1,75 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Plus, Zap } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
-import { supabase } from '@/lib/supabase'
-import type { TaskRecord } from '@/lib/supabase'
+import { Button } from '@/components/ui/Button'
+import { supabase, type TaskRecord } from '@/lib/supabase'
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<TaskRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const [tasks,setTasks]=useState<TaskRecord[]>([])
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState<string|null>(null)
+  const [showForm,setShowForm]=useState(false)
+  const [saving,setSaving]=useState(false)
+  const [title,setTitle]=useState('')
+  const [priority,setPriority]=useState('Medium')
+  const [status,setStatus]=useState('Next')
+  const [dueDate,setDueDate]=useState('')
+  const [filter,setFilter]=useState('All')
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('wh_tasks')
-          .select('*')
-          .order('created_at', { ascending: false })
+  async function load(){
+    setLoading(true); setError(null)
+    const {data,error}=await supabase.from('wh_tasks').select('*').order('created_at',{ascending:false})
+    if(error)setError(error.message); else setTasks((data||[]) as TaskRecord[])
+    setLoading(false)
+  }
+  useEffect(()=>{load()},[])
 
-        if (error) throw error
-        setTasks(data || [])
-      } catch (error) {
-        console.error('Error fetching tasks:', error)
-      } finally {
-        setLoading(false)
-      }
+  async function createTask(e:FormEvent){
+    e.preventDefault()
+    if(!title.trim()) return
+    setSaving(true)
+    const org=await supabase.from('wh_organizations').select('id').eq('slug','xrmg').single()
+    if(org.error||!org.data){setError(org.error?.message||'Organização XRMG não encontrada');setSaving(false);return}
+    const {error}=await supabase.from('wh_tasks').insert({
+      org_id:org.data.id,title:title.trim(),priority,status,due_date:dueDate||null,area:'Operations',owner_role:'CEO'
+    })
+    if(error){setError(error.message)} else {
+      setTitle('');setDueDate('');setPriority('Medium');setStatus('Next');setShowForm(false);await load()
     }
-
-    fetchTasks()
-  }, [])
-
-  const statusCounts = {
-    total: tasks.length,
-    open: tasks.filter(t => ['Inbox', 'Next', 'In Progress', 'Waiting'].includes(t.status)).length,
-    done: tasks.filter(t => t.status === 'Done').length,
-    blocked: tasks.filter(t => t.status === 'Parked').length,
+    setSaving(false)
   }
 
-  const statusCards = [
-    { label: 'Total', value: statusCounts.total, icon: '📋' },
-    { label: 'Open', value: statusCounts.open, icon: '⏱️' },
-    { label: 'Done', value: statusCounts.done, icon: '✅' },
-    { label: 'Blocked', value: statusCounts.blocked, icon: '⚠️' },
-  ]
+  const filtered=useMemo(()=>filter==='All'?tasks:tasks.filter(t=>t.status===filter),[tasks,filter])
+  const overdue=tasks.filter(t=>t.due_date&&t.due_date<new Date().toISOString().slice(0,10)&&t.status!=='Done').length
 
-  if (loading) {
-    return (
-      <div className="flex-1 overflow-y-auto px-10 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Carregando tarefas...</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="px-10 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <p className="section-label">EXECUTION</p>
-            <h1 className="section-title mb-2">Tasks & Sprints</h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Execution inbox — all tasks across brands and projects
-            </p>
-          </div>
-          <Button>
-            <Plus size={20} />
-            New Task
-          </Button>
-        </div>
-
-        {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {statusCards.map((card) => (
-            <Card key={card.label}>
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {card.label}
-                  </p>
-                  <p className="text-5xl font-bold text-gray-900 dark:text-white mt-2">
-                    {card.value}
-                  </p>
-                </div>
-                <span className="text-3xl">{card.icon}</span>
-              </div>
-            </Card>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <div className="flex gap-4 mb-8">
-          <select className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm">
-            <option>All Statuses</option>
-          </select>
-          <select className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm">
-            <option>All Brands</option>
-          </select>
-        </div>
-
-        {/* Empty State */}
-        {tasks.length === 0 ? (
-          <Card className="text-center py-16">
-            <Zap size={64} className="mx-auto mb-4 text-gray-400" />
-            <p className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No tasks yet
-            </p>
-            <p className="text-gray-600 dark:text-gray-400">
-              Click &quot;New Task&quot; to create your first task
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {tasks.map((task) => (
-              <Card key={task.id} className="p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{task.title}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{task.area}</p>
-                  </div>
-                  <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
-                    {task.status}
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+  return <div className="p-4 sm:p-6 lg:p-10 max-w-screen-xl mx-auto">
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+      <div><p className="text-xs font-bold tracking-[0.18em] text-slate-500">EXECUÇÃO</p><h1 className="text-3xl font-black mt-1">Tarefas</h1><p className="text-slate-500 mt-2">{tasks.length} registradas · {overdue} vencidas</p></div>
+      <Button onClick={()=>setShowForm(v=>!v)}><Plus size={18}/>Nova tarefa</Button>
     </div>
-  )
+
+    {showForm&&<Card className="p-5 mb-6">
+      <div className="flex justify-between items-center mb-4"><h2 className="font-bold">Criar tarefa</h2><button onClick={()=>setShowForm(false)}><X size={18}/></button></div>
+      <form onSubmit={createTask} className="grid md:grid-cols-4 gap-3">
+        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="O que precisa ser feito?" className="md:col-span-4 px-3 py-2.5 rounded-lg border border-slate-300" required/>
+        <select value={priority} onChange={e=>setPriority(e.target.value)} className="px-3 py-2.5 rounded-lg border border-slate-300"><option>High</option><option>Medium</option><option>Low</option></select>
+        <select value={status} onChange={e=>setStatus(e.target.value)} className="px-3 py-2.5 rounded-lg border border-slate-300"><option>Inbox</option><option>Next</option><option>In Progress</option><option>Waiting</option><option>Done</option><option>Parked</option></select>
+        <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} className="px-3 py-2.5 rounded-lg border border-slate-300"/>
+        <Button type="submit" disabled={saving}>{saving?'Salvando…':'Criar tarefa'}</Button>
+      </form>
+    </Card>}
+
+    {error&&<Card className="p-5 border-red-200 mb-6"><p className="font-semibold text-red-700">Não foi possível concluir a operação.</p><p className="text-sm text-slate-500 mt-1">{error}</p></Card>}
+
+    <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+      {['All','Inbox','Next','In Progress','Waiting','Done','Parked'].map(s=><button key={s} onClick={()=>setFilter(s)} className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${filter===s?'bg-slate-950 text-white':'bg-white border border-slate-200'}`}>{s==='All'?'Todas':s}</button>)}
+    </div>
+
+    {loading?<Card className="p-8 text-center text-slate-500">Carregando tarefas…</Card>:filtered.length===0?<Card className="p-8 text-center text-slate-500">Nenhuma tarefa nesta visão.</Card>:
+      <div className="space-y-3">{filtered.map(task=><Card key={task.id} className="p-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div><p className="font-bold">{task.title}</p><p className="text-sm text-slate-500 mt-1">{task.area||'Sem área'} · {task.owner_role||'Sem responsável'}{task.due_date?` · prazo ${task.due_date}`:''}</p></div><div className="flex gap-2"><span className="text-xs bg-slate-100 rounded-full px-2.5 py-1">{task.status}</span>{task.priority&&<span className="text-xs bg-amber-50 text-amber-700 rounded-full px-2.5 py-1">{task.priority}</span>}</div></div>
+      </Card>)}</div>}
+  </div>
 }
