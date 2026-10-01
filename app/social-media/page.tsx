@@ -40,8 +40,36 @@ type Account = {
 type Fact = {
   id: string
   brand_id: string
+  category: string
   fact_text: string
   status: string
+  source_name?: string | null
+  source_url?: string | null
+  approved_at?: string | null
+}
+
+type Asset = {
+  id: string
+  brand_id: string
+  kind: string
+  name: string
+  url: string
+  approved: boolean
+  metadata: Record<string, unknown>
+}
+
+type CreativeRender = {
+  id: string
+  brand_id: string
+  content_id: string
+  template_id: string
+  provider: string
+  status: string
+  external_design_id?: string | null
+  edit_url?: string | null
+  view_url?: string | null
+  error_message?: string | null
+  created_at: string
 }
 
 const statusLabel: Record<string, string> = {
@@ -65,6 +93,8 @@ export default function SocialMediaOSPage() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [facts, setFacts] = useState<Fact[]>([])
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [renders, setRenders] = useState<CreativeRender[]>([])
   const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -80,15 +110,17 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, templatesRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_accounts').select('*').order('created_at', { ascending: false }),
-      supabase.from('sm_brand_facts').select('id,brand_id,fact_text,status').order('created_at', { ascending: false }),
+      supabase.from('sm_brand_facts').select('*').order('created_at', { ascending: false }),
+      supabase.from('sm_brand_assets').select('*').order('created_at', { ascending: false }),
+      supabase.from('sm_template_renders').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || templatesRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -100,6 +132,8 @@ export default function SocialMediaOSPage() {
     setContent((contentRes.data ?? []) as ContentItem[])
     setAccounts((accountsRes.data ?? []) as Account[])
     setFacts((factsRes.data ?? []) as Fact[])
+    setAssets((assetsRes.data ?? []) as Asset[])
+    setRenders((rendersRes.data ?? []) as CreativeRender[])
     setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
@@ -124,6 +158,18 @@ export default function SocialMediaOSPage() {
   const filteredTemplates = useMemo(
     () => templates.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [templates, selectedBrandId],
+  )
+  const filteredFacts = useMemo(
+    () => facts.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [facts, selectedBrandId],
+  )
+  const filteredAssets = useMemo(
+    () => assets.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [assets, selectedBrandId],
+  )
+  const filteredRenders = useMemo(
+    () => renders.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [renders, selectedBrandId],
   )
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
@@ -274,6 +320,130 @@ export default function SocialMediaOSPage() {
     else {
       setNotice(`${rows.length} peças multicanal criadas e enviadas para revisão.`)
       event.currentTarget.reset()
+      await loadAll()
+    }
+  }
+
+  async function createFact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedBrandId) return
+    const form = new FormData(event.currentTarget)
+    const factText = String(form.get('fact_text') || '').trim()
+    const category = String(form.get('fact_category') || 'geral').trim()
+    const sourceName = String(form.get('fact_source_name') || '').trim()
+    const sourceUrl = String(form.get('fact_source_url') || '').trim()
+    if (!factText) return
+
+    const { data: userData } = await supabase.auth.getUser()
+    setBusy(true)
+    const { error: insertError } = await supabase.from('sm_brand_facts').insert({
+      brand_id: selectedBrandId,
+      category: category || 'geral',
+      fact_text: factText,
+      status: 'draft',
+      source_name: sourceName || null,
+      source_url: sourceUrl || null,
+      created_by: userData.user?.email || 'authenticated-user',
+    })
+    setBusy(false)
+    if (insertError) setError(insertError.message)
+    else {
+      setNotice('Fato adicionado como rascunho.')
+      event.currentTarget.reset()
+      await loadAll()
+    }
+  }
+
+  async function approveFact(fact: Fact) {
+    const { data: userData } = await supabase.auth.getUser()
+    setBusy(true)
+    const { error: updateError } = await supabase
+      .from('sm_brand_facts')
+      .update({
+        status: 'approved',
+        verified_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+        approved_by: userData.user?.email || 'authenticated-user',
+      })
+      .eq('id', fact.id)
+    setBusy(false)
+    if (updateError) setError(updateError.message)
+    else {
+      setNotice('Fato aprovado e liberado para geração.')
+      await loadAll()
+    }
+  }
+
+  async function createAsset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedBrandId) return
+    const form = new FormData(event.currentTarget)
+    const name = String(form.get('asset_name') || '').trim()
+    const url = String(form.get('asset_url') || '').trim()
+    const kind = String(form.get('asset_kind') || 'image').trim()
+    if (!name || !url) return
+
+    setBusy(true)
+    const { error: insertError } = await supabase.from('sm_brand_assets').insert({
+      brand_id: selectedBrandId,
+      kind,
+      name,
+      url,
+      approved: false,
+      metadata: {},
+    })
+    setBusy(false)
+    if (insertError) setError(insertError.message)
+    else {
+      setNotice('Asset adicionado à biblioteca.')
+      event.currentTarget.reset()
+      await loadAll()
+    }
+  }
+
+  async function toggleAssetApproval(asset: Asset) {
+    setBusy(true)
+    const { error: updateError } = await supabase
+      .from('sm_brand_assets')
+      .update({ approved: !asset.approved })
+      .eq('id', asset.id)
+    setBusy(false)
+    if (updateError) setError(updateError.message)
+    else {
+      setNotice(asset.approved ? 'Asset removido da lista aprovada.' : 'Asset aprovado para uso.')
+      await loadAll()
+    }
+  }
+
+  async function completeRender(render: CreativeRender) {
+    const editUrl = window.prompt('URL de edição da cópia no Canva')
+    if (!editUrl) return
+    const viewUrl = window.prompt('URL pública/visualização (opcional)') || null
+    setBusy(true)
+    const { error: renderError } = await supabase
+      .from('sm_template_renders')
+      .update({
+        status: 'ready',
+        edit_url: editUrl,
+        view_url: viewUrl,
+        error_message: null,
+      })
+      .eq('id', render.id)
+    const { error: contentError } = await supabase
+      .from('sm_content')
+      .update({
+        production_status: 'creative_ready',
+        template_status: 'ready',
+        creative_provider: render.provider,
+        creative_edit_url: editUrl,
+        creative_view_url: viewUrl,
+      })
+      .eq('id', render.content_id)
+    setBusy(false)
+    if (renderError) setError(renderError.message)
+    else if (contentError) setError(contentError.message)
+    else {
+      setNotice('Arte marcada como pronta e vinculada ao conteúdo.')
       await loadAll()
     }
   }
@@ -557,6 +727,86 @@ export default function SocialMediaOSPage() {
           </section>
         </div>
 
+        <div className="grid gap-6 xl:grid-cols-2">
+          <section className={panel}>
+            <h2 className="text-lg font-bold">Brand Knowledge</h2>
+            <p className="mt-1 text-xs text-gray-500">Somente fatos aprovados entram como verdade comercial na geração.</p>
+            <form onSubmit={createFact} className="mt-4 space-y-3">
+              <textarea className={input} name="fact_text" placeholder="Fato confirmado sobre a marca" rows={3} required />
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className={input} name="fact_category" placeholder="Categoria (preço, produto, política...)" />
+                <input className={input} name="fact_source_name" placeholder="Fonte" />
+              </div>
+              <input className={input} name="fact_source_url" placeholder="URL da fonte (opcional)" />
+              <button disabled={busy || !selectedBrand} className="w-full rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                Adicionar fato
+              </button>
+            </form>
+            <div className="mt-4 space-y-2">
+              {filteredFacts.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhum fato cadastrado.</div>
+              ) : filteredFacts.slice(0, 10).map((fact) => (
+                <div key={fact.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{fact.fact_text}</p>
+                      <p className="mt-1 text-xs text-gray-500">{fact.category} · {fact.status}</p>
+                    </div>
+                    {fact.status !== 'approved' && (
+                      <button onClick={() => void approveFact(fact)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+                        Aprovar
+                      </button>
+                    )}
+                  </div>
+                  {fact.source_url && (
+                    <a href={fact.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline">
+                      Ver fonte <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={panel}>
+            <h2 className="text-lg font-bold">Brand Assets</h2>
+            <p className="mt-1 text-xs text-gray-500">Logos, imagens, vídeos, templates e referências aprovadas por marca.</p>
+            <form onSubmit={createAsset} className="mt-4 space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className={input} name="asset_name" placeholder="Nome do asset" required />
+                <select className={input} name="asset_kind" defaultValue="image">
+                  <option value="logo">Logo</option>
+                  <option value="image">Imagem</option>
+                  <option value="video">Vídeo</option>
+                  <option value="template">Template</option>
+                  <option value="font">Fonte</option>
+                  <option value="reference">Referência</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+              <input className={input} name="asset_url" placeholder="URL do arquivo" required />
+              <button disabled={busy || !selectedBrand} className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                Adicionar asset
+              </button>
+            </form>
+            <div className="mt-4 space-y-2">
+              {filteredAssets.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhum asset cadastrado.</div>
+              ) : filteredAssets.slice(0, 10).map((asset) => (
+                <div key={asset.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="min-w-0">
+                    <a href={asset.url} target="_blank" rel="noreferrer" className="truncate text-sm font-semibold text-blue-700 hover:underline">{asset.name}</a>
+                    <p className="text-xs text-gray-500">{asset.kind} · {asset.approved ? 'aprovado' : 'pendente'}</p>
+                  </div>
+                  <button onClick={() => void toggleAssetApproval(asset)} className="rounded-lg border px-3 py-2 text-xs font-semibold">
+                    {asset.approved ? 'Desaprovar' : 'Aprovar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
         <section className={panel}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
@@ -634,6 +884,51 @@ export default function SocialMediaOSPage() {
               </button>
             </form>
           </details>
+        </section>
+
+        <section className={panel}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Creative Queue</h2>
+              <p className="mt-1 text-xs text-gray-500">Acompanhe artes preparadas e vincule a cópia final do Canva sem tocar no master.</p>
+            </div>
+            <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">{filteredRenders.length} jobs</span>
+          </div>
+          <div className="mt-4 space-y-2">
+            {filteredRenders.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-5 text-sm text-gray-500">Nenhuma arte em preparação.</div>
+            ) : filteredRenders.slice(0, 12).map((render) => {
+              const item = content.find((candidate) => candidate.id === render.content_id)
+              const template = templateById.get(render.template_id)
+              return (
+                <div key={render.id} className="rounded-xl border p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="rounded-full bg-violet-50 px-2 py-1 font-semibold text-violet-700">{render.status}</span>
+                        <span className="text-gray-500">{render.provider}</span>
+                      </div>
+                      <p className="mt-2 font-semibold">{item?.theme || item?.code || render.content_id}</p>
+                      <p className="mt-1 text-xs text-gray-500">{template?.name || 'Template'} · {new Date(render.created_at).toLocaleString()}</p>
+                      {render.error_message && <p className="mt-2 text-xs text-red-600">{render.error_message}</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {render.edit_url && (
+                        <a href={render.edit_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold">
+                          Abrir arte <ExternalLink size={13} />
+                        </a>
+                      )}
+                      {render.status !== 'ready' && (
+                        <button onClick={() => void completeRender(render)} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white">
+                          Marcar pronta
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </section>
 
         <section className={panel}>
