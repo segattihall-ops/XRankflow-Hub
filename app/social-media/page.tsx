@@ -135,6 +135,15 @@ export default function SocialMediaOSPage() {
   const [renders, setRenders] = useState<CreativeRender[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [bufferStatus, setBufferStatus] = useState<BufferProviderStatus | null>(null)
+  const [workerStatus, setWorkerStatus] = useState<{
+    ready: boolean
+    checks: {
+      cron_secret: boolean
+      supabase_service_role: boolean
+      buffer_api_key: boolean
+    }
+    schedule: string
+  } | null>(null)
   const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -202,6 +211,22 @@ export default function SocialMediaOSPage() {
   useEffect(() => {
     void loadBufferStatus()
   }, [loadBufferStatus])
+
+  const loadWorkerStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/social/worker/status', { cache: 'no-store' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'worker_status_failed')
+      setWorkerStatus(data)
+    } catch {
+      setWorkerStatus(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadWorkerStatus()
+  }, [loadWorkerStatus])
+
 
 
   const filteredContent = useMemo(
@@ -1353,6 +1378,15 @@ export default function SocialMediaOSPage() {
               <div className="flex justify-between"><span>Canva master library</span><b className="text-emerald-700">{filteredTemplates.length ? 'Conectada' : 'Sem templates'}</b></div>
               <div className="flex justify-between"><span>Aprovação e agendamento</span><b className="text-emerald-700">Ativos</b></div>
               <div className="flex justify-between"><span>Publicação externa</span><b className={bufferStatus?.configured ? 'text-emerald-700' : 'text-amber-700'}>{bufferStatus?.configured ? 'Buffer configurado' : 'Aguardando BUFFER_API_KEY'}</b></div>
+              <div className="flex justify-between gap-4"><span>Worker automático</span><b className={workerStatus?.ready ? 'text-emerald-700' : 'text-amber-700'}>{workerStatus?.ready ? 'Ativo a cada 5 min' : 'Aguardando secrets'}</b></div>
+              {workerStatus && !workerStatus.ready && (
+                <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                  Faltando:
+                  {!workerStatus.checks.cron_secret ? ' CRON_SECRET' : ''}
+                  {!workerStatus.checks.supabase_service_role ? ' SUPABASE_SERVICE_ROLE_KEY' : ''}
+                  {!workerStatus.checks.buffer_api_key ? ' BUFFER_API_KEY' : ''}
+                </div>
+              )}
               <div className="flex justify-between"><span>Pesquisa externa automática</span><b className="text-amber-700">Aguardando provedor autorizado</b></div>
             </div>
           </section>
