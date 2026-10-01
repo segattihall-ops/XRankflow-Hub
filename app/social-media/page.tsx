@@ -35,6 +35,9 @@ type Account = {
   handle: string
   status: string
   paused: boolean
+  provider?: string | null
+  provider_channel_id?: string | null
+  buffer_channel_id?: string | null
 }
 
 type Fact = {
@@ -56,6 +59,20 @@ type Asset = {
   url: string
   approved: boolean
   metadata: Record<string, unknown>
+}
+
+type QueueItem = {
+  id: string
+  content_id: string
+  brand_id: string
+  account_id: string
+  status: string
+  due_at: string
+  attempts: number
+  max_attempts: number
+  external_post_id?: string | null
+  external_url?: string | null
+  last_error?: string | null
 }
 
 type CreativeRender = {
@@ -95,6 +112,7 @@ export default function SocialMediaOSPage() {
   const [facts, setFacts] = useState<Fact[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
   const [renders, setRenders] = useState<CreativeRender[]>([])
+  const [queue, setQueue] = useState<QueueItem[]>([])
   const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -110,7 +128,7 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, templatesRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
@@ -118,9 +136,10 @@ export default function SocialMediaOSPage() {
       supabase.from('sm_brand_facts').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_brand_assets').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_template_renders').select('*').order('created_at', { ascending: false }).limit(250),
+      supabase.from('sm_queue').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || templatesRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -134,6 +153,7 @@ export default function SocialMediaOSPage() {
     setFacts((factsRes.data ?? []) as Fact[])
     setAssets((assetsRes.data ?? []) as Asset[])
     setRenders((rendersRes.data ?? []) as CreativeRender[])
+    setQueue((queueRes.data ?? []) as QueueItem[])
     setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
@@ -170,6 +190,10 @@ export default function SocialMediaOSPage() {
   const filteredRenders = useMemo(
     () => renders.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [renders, selectedBrandId],
+  )
+  const filteredQueue = useMemo(
+    () => queue.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [queue, selectedBrandId],
   )
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
@@ -565,6 +589,33 @@ export default function SocialMediaOSPage() {
     }
   }
 
+  async function enqueueItem(item: ContentItem) {
+    const compatible = filteredAccounts.filter(
+      (account) => account.platform === item.platform && account.status === 'conectada' && !account.paused,
+    )
+    if (!compatible.length) {
+      setError('Nenhuma conta conectada para esta plataforma. Conecte/mapeie a conta antes de enviar para publicação.')
+      return
+    }
+    const account = compatible.length === 1
+      ? compatible[0]
+      : compatible.find((candidate) => window.confirm(`Usar @${candidate.handle} (${candidate.provider || 'buffer'})?`))
+    if (!account) return
+
+    setBusy(true)
+    const { data, error: rpcError } = await supabase.rpc('sm_enqueue_content', {
+      p_content_id: item.id,
+      p_account_id: account.id,
+      p_due_at: item.scheduled_for || new Date().toISOString(),
+    })
+    setBusy(false)
+    if (rpcError) setError(rpcError.message)
+    else {
+      setNotice(`Publicação adicionada à fila com segurança: ${String(data).slice(0, 8)}…`)
+      await loadAll()
+    }
+  }
+
   async function scheduleItem(item: ContentItem) {
     const when = window.prompt('Data/hora ISO para agendar (ex.: 2026-10-01T15:00:00-05:00)')
     if (!when) return
@@ -887,6 +938,51 @@ export default function SocialMediaOSPage() {
         </section>
 
         <section className={panel}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Contas e fila de publicação</h2>
+              <p className="mt-1 text-xs text-gray-500">Provider-agnostic, com idempotência, tentativas e confirmação externa.</p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{filteredQueue.length} jobs</span>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Contas da marca</p>
+              {filteredAccounts.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhuma conta social mapeada.</div>
+              ) : filteredAccounts.map((account) => (
+                <div key={account.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div><b>{account.platform}</b> · @{account.handle}</div>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px]">{account.status}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Provider: {account.provider || 'buffer'} · {account.provider_channel_id || account.buffer_channel_id || 'canal não mapeado'}</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Fila</p>
+              {filteredQueue.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Fila vazia.</div>
+              ) : filteredQueue.slice(0, 12).map((job) => {
+                const item = content.find((candidate) => candidate.id === job.content_id)
+                return (
+                  <div key={job.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{item?.theme || item?.code || job.content_id}</p>
+                      <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px]">{job.status}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">{new Date(job.due_at).toLocaleString()} · tentativa {job.attempts}/{job.max_attempts}</p>
+                    {job.external_url && <a href={job.external_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600">Ver publicação <ExternalLink size={12}/></a>}
+                    {job.last_error && <p className="mt-2 text-xs text-red-600">{job.last_error}</p>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className={panel}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold">Creative Queue</h2>
@@ -983,7 +1079,12 @@ export default function SocialMediaOSPage() {
                         </>
                       )}
                       {item.status === 'aprovado' && (
-                        <button onClick={() => void scheduleItem(item)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
+                        <button onClick={() => void scheduleItem(item)}
+                      {(item.status === 'aprovado' || item.status === 'agendado') && (
+                        <button onClick={() => void enqueueItem(item)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" disabled={busy}>
+                          Enviar à fila
+                        </button>
+                      )} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
                           <CalendarDays size={14} /> Agendar
                         </button>
                       )}
