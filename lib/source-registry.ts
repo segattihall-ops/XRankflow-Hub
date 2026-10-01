@@ -77,6 +77,18 @@ export const sourceRegistry: SourceRegistryEntry[] = [
     health: 'unknown',
   },
   {
+    key: 'crm',
+    name: 'CRM federado',
+    purpose: 'Leads, contatos, clientes, parceiros e oportunidades',
+    authority: 'Os CRMs externos continuam autoritativos; o XRANKFLOW OS mantém apenas projeções normalizadas read-only',
+    state: 'pending',
+    supportedActions: ['Modelo federado e deduplicação por external ID prontos'],
+    unsupportedActions: ['Ingestão externa', 'Atualização do CRM de origem', 'Criação de oportunidades na fonte'],
+    discoveryEvidence: 'Tabelas xrmg_crm_entities, xrmg_crm_opportunities e xrmg_crm_timeline disponíveis; nenhum adapter externo ativo',
+    snapshotDate: '2026-09-30',
+    health: 'unknown',
+  },
+  {
     key: 'email',
     name: 'Email',
     purpose: 'Universal Inbox e follow-up',
