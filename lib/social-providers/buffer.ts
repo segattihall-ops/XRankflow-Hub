@@ -103,11 +103,42 @@ export async function listAllBufferChannels() {
   return results
 }
 
+export type BufferCreativeAsset = {
+  type: 'image' | 'video'
+  url: string
+  thumbnailOffset?: number
+}
+
+function assetLiteral(asset: BufferCreativeAsset) {
+  if (asset.type === 'video') {
+    const metadata = typeof asset.thumbnailOffset === 'number'
+      ? ` metadata: { thumbnailOffset: ${Math.max(0, Math.floor(asset.thumbnailOffset))} }`
+      : ''
+    return `{ video: { url: ${q(asset.url)}${metadata} } }`
+  }
+  return `{ image: { url: ${q(asset.url)} } }`
+}
+
+function metadataLiteral(platform?: string, format?: string) {
+  if (platform !== 'instagram') return ''
+  const type = format === 'video_curto' ? 'reel' : format === 'story' ? 'story' : 'post'
+  return ` metadata: { instagram: { type: ${type} shouldShareToFeed: true } }`
+}
+
 export async function createBufferScheduledPost(input: {
   channelId: string
   text: string
   dueAt: string
+  platform?: string
+  format?: string
+  assets?: BufferCreativeAsset[]
 }) {
+  const assets = input.assets ?? []
+  const assetsClause = assets.length
+    ? ` assets: [${assets.map(assetLiteral).join(' ')}]`
+    : ''
+  const metadataClause = metadataLiteral(input.platform, input.format)
+
   const data = await bufferGraphQL<{
     createPost?: {
       post?: {
@@ -126,6 +157,8 @@ export async function createBufferScheduledPost(input: {
         schedulingType: automatic
         mode: customScheduled
         dueAt: ${q(input.dueAt)}
+        ${assetsClause}
+        ${metadataClause}
       }) {
         ... on PostActionSuccess {
           post {
