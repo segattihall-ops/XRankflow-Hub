@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     p_due_date: dueDate,
     p_project_id: projectId,
     p_area: 'Operations',
-    p_owner_role: 'CEO',
+    p_owner_role: null,
     p_idempotency_key: idempotencyKey,
   })
 
