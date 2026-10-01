@@ -2,157 +2,41 @@
 
 import { useEffect, useState } from 'react'
 import { Activity } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 
-interface ActivityLogEntry {
-  id: string
-  user_name: string
-  user_avatar: string
-  action: string
-  resource: string
-  resource_type: string
-  created_at: string
-}
+type Row={id:string;kind:'Task'|'Finance';label:string;actor:string;created_at:string}
 
-interface TaskActivitySource {
-  id: string
-  title: string
-  created_at: string
-  owner_role: string
-}
+export default function ActivityPage(){
+ const [rows,setRows]=useState<Row[]>([])
+ const [loading,setLoading]=useState(true)
+ const [error,setError]=useState<string|null>(null)
 
-interface FinanceActivitySource {
-  id: string
-  item: string
-  created_at: string
-}
+ useEffect(()=>{
+  Promise.all([
+   supabase.from('wh_tasks').select('id,title,created_at,owner_role').order('created_at',{ascending:false}).limit(10),
+   supabase.from('wh_finance').select('id,item,created_at').order('created_at',{ascending:false}).limit(10),
+  ]).then(([t,f])=>{
+   const first=t.error||f.error
+   if(first)setError(first.message)
+   else {
+    const taskRows=(t.data||[]).map(x=>({id:x.id,kind:'Task' as const,label:x.title,actor:x.owner_role||'Responsável não definido',created_at:x.created_at}))
+    const finRows=(f.data||[]).map(x=>({id:x.id,kind:'Finance' as const,label:x.item,actor:'Finance',created_at:x.created_at}))
+    setRows([...taskRows,...finRows].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()))
+   }
+   setLoading(false)
+  })
+ },[])
 
-export default function ActivityPage() {
-  const [activities, setActivities] = useState<ActivityLogEntry[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        // Try to fetch from activity log table if it exists
-        const { data, error } = await supabase
-          .from('wh_activity_log')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(20)
-
-        if (!error && data) {
-          setActivities(data as ActivityLogEntry[])
-        } else {
-          // Fallback: show recent tasks and finance records
-          const [tasks, finance] = await Promise.all([
-            supabase.from('wh_tasks').select('id, title, created_at, owner_role').order('created_at', { ascending: false }).limit(5),
-            supabase.from('wh_finance').select('id, item, created_at').order('created_at', { ascending: false }).limit(5),
-          ])
-
-          const taskRows = (tasks.data ?? []) as TaskActivitySource[]
-          const financeRows = (finance.data ?? []) as FinanceActivitySource[]
-
-          const combined = [
-            ...taskRows.map((t) => ({
-              id: t.id,
-              user_name: t.owner_role,
-              user_avatar: t.owner_role.substring(0, 1),
-              action: 'criou',
-              resource: t.title,
-              resource_type: 'Task',
-              created_at: t.created_at,
-            })),
-            ...financeRows.map((f) => ({
-              id: f.id,
-              user_name: 'Finance',
-              user_avatar: 'F',
-              action: 'registrou',
-              resource: f.item,
-              resource_type: 'Finance',
-              created_at: f.created_at,
-            })),
-          ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-          setActivities(combined)
-        }
-      } catch (error) {
-        console.error('Error fetching activities:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchActivities()
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex-1 overflow-y-auto px-10 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Carregando atividades...</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="px-10 py-8">
-        {/* Header */}
-        <div>
-          <p className="section-label">LOGS</p>
-          <h1 className="section-title mb-2">System Activity Log</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            Registro imutável de todas as ações do hub · {activities.length} atividades
-          </p>
-        </div>
-
-        {/* Activity Timeline */}
-        <div className="space-y-0">
-          {activities.length > 0 ? (
-            activities.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex gap-4 p-5 border-b border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-              >
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{ backgroundColor: '#3b82f6' }}
-                >
-                  {entry.user_avatar}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {entry.user_name}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400"> {entry.action} </span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {entry.resource_type}:
-                    </span>
-                    <span className="text-blue-600 dark:text-blue-400 font-medium">
-                      {' '}
-                      {entry.resource}
-                    </span>
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                    {new Date(entry.created_at).toLocaleString('pt-BR')}
-                  </p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-16">
-              <Activity size={64} className="mx-auto mb-4 text-gray-400" />
-              <p className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Nenhuma atividade ainda
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+ return <div className="p-4 sm:p-6 lg:p-10 max-w-screen-xl mx-auto">
+  <p className="text-xs font-bold tracking-[0.18em] text-slate-500">ATIVIDADE RECENTE</p>
+  <h1 className="text-3xl font-black mt-1">Activity</h1>
+  <p className="text-slate-500 mt-2 mb-8">Eventos recentes reconstruídos a partir de registros atuais. Esta tela ainda não é um audit log imutável.</p>
+  {loading&&<Card className="p-8 text-center text-slate-500">Carregando atividade…</Card>}
+  {error&&<Card className="p-8 border-red-200"><p className="font-bold text-red-700">Não foi possível carregar atividade.</p><p className="text-sm text-slate-500 mt-2">{error}</p></Card>}
+  {!loading&&!error&&rows.length===0&&<Card className="p-12 text-center"><Activity size={42} className="mx-auto text-slate-300"/><p className="font-semibold mt-3">Nenhuma atividade disponível</p></Card>}
+  <div className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-xl overflow-hidden">
+   {rows.map(r=><div key={r.kind+r.id} className="p-4 flex justify-between gap-4"><div><p className="font-semibold text-sm">{r.label}</p><p className="text-xs text-slate-500 mt-1">{r.kind} · {r.actor}</p></div><p className="text-xs text-slate-400 whitespace-nowrap">{new Date(r.created_at).toLocaleString('pt-BR')}</p></div>)}
+  </div>
+ </div>
 }
