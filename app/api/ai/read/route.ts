@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { sourceRegistry } from '@/lib/source-registry'
+import { sourceRegistry, sourceStateLabel } from '@/lib/source-registry'
 
 type Command = 'attention' | 'overdue' | 'health' | 'company_status' | 'source_lookup'
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       command,
       generated_at: generatedAt,
       sources: ['wh_tasks'],
-      result: { overdue_tasks: data || [] },
+      summary: [\`${(data || []).length} tarefa(s) vencida(s) encontrada(s).\`],\n      result: { overdue_tasks: data || [] },
     })
   }
 
@@ -171,6 +171,6 @@ export async function POST(request: NextRequest) {
     command,
     generated_at: generatedAt,
     sources: ['lib/source-registry.ts'],
-    result: { source },
+    summary: [\n      \`Estado: ${sourceStateLabel(source.state)}.\`,\n      \`Autoridade: ${source.authority}\`,\n      \`${source.supportedActions.length} capacidade(s) declarada(s) como disponível(is).\`,\n    ],\n    result: { source },
   })
 }
