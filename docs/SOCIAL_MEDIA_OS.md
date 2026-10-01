@@ -103,3 +103,33 @@ When a Canva source exposes an Autofill dataset, change its template capability 
 6. If the template is `autofill`, the render may be processed by a configured Canva adapter.
 7. If it is `copy_manual`, the item is explicitly marked `manual_edit_required` and the master is never overwritten.
 8. Final creative URLs/IDs must be stored before the creative is treated as externally rendered.
+
+
+## Publishing Provider Layer
+
+The Social Media OS now has a provider-agnostic publishing queue.
+
+### Buffer adapter
+
+Server-only endpoints:
+- `GET /api/social/providers/buffer/status` — checks whether Buffer is configured and discovers organizations/channels.
+- `POST /api/social/providers/buffer/map` — maps one discovered Buffer channel to one selected brand.
+- `POST /api/social/publish/dispatch` — atomically claims a queue item and schedules it in Buffer.
+- `POST /api/social/publish/reconcile` — checks Buffer after dispatch and only marks the item published after Buffer reports `sent`.
+
+Runtime secret:
+- `BUFFER_API_KEY` must be configured in Vercel Production/Preview as appropriate.
+- The key is server-side only and is never returned to the browser or stored in Social Media OS tables.
+
+Publishing safety:
+- Only approved or scheduled content can enter the queue.
+- Brand, campaign, account, platform and pause state are revalidated by the database RPC.
+- Queue entries use an idempotency key to avoid duplicate dispatch.
+- A Buffer `createPost` success is stored as `enviado_api`, not `publicado`.
+- Publication becomes `publicado` only after reconciliation observes Buffer status `sent`.
+- Failed attempts are recorded with exponential retry metadata.
+- Instagram, TikTok, Pinterest and YouTube are deliberately blocked by the text-only worker until media-specific dispatch is implemented.
+
+### Current external blocker
+
+If `BUFFER_API_KEY` is absent from the Vercel environment, the dashboard displays the blocker and dispatch buttons remain disabled. No post is consumed from the queue in that state.

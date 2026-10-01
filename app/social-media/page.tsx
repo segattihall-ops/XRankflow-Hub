@@ -35,6 +35,9 @@ type Account = {
   handle: string
   status: string
   paused: boolean
+  provider?: string | null
+  provider_channel_id?: string | null
+  buffer_channel_id?: string | null
 }
 
 type Fact = {
@@ -56,6 +59,41 @@ type Asset = {
   url: string
   approved: boolean
   metadata: Record<string, unknown>
+}
+
+type QueueItem = {
+  id: string
+  content_id: string
+  brand_id: string
+  account_id: string
+  status: string
+  due_at: string
+  attempts: number
+  max_attempts: number
+  external_post_id?: string | null
+  external_url?: string | null
+  last_error?: string | null
+}
+
+type BufferProviderStatus = {
+  configured: boolean
+  provider?: string
+  blocker?: string
+  error?: string
+  organizations?: Array<{
+    organization: { id: string; name: string }
+    channels: Array<{
+      id: string
+      name: string
+      displayName?: string | null
+      service: string
+      avatar?: string | null
+      isQueuePaused?: boolean
+      isDisconnected?: boolean
+      isLocked?: boolean
+      externalLink?: string | null
+    }>
+  }>
 }
 
 type CreativeRender = {
@@ -95,6 +133,8 @@ export default function SocialMediaOSPage() {
   const [facts, setFacts] = useState<Fact[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
   const [renders, setRenders] = useState<CreativeRender[]>([])
+  const [queue, setQueue] = useState<QueueItem[]>([])
+  const [bufferStatus, setBufferStatus] = useState<BufferProviderStatus | null>(null)
   const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -110,7 +150,7 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, templatesRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
@@ -118,9 +158,10 @@ export default function SocialMediaOSPage() {
       supabase.from('sm_brand_facts').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_brand_assets').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_template_renders').select('*').order('created_at', { ascending: false }).limit(250),
+      supabase.from('sm_queue').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || templatesRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -134,6 +175,7 @@ export default function SocialMediaOSPage() {
     setFacts((factsRes.data ?? []) as Fact[])
     setAssets((assetsRes.data ?? []) as Asset[])
     setRenders((rendersRes.data ?? []) as CreativeRender[])
+    setQueue((queueRes.data ?? []) as QueueItem[])
     setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
@@ -142,6 +184,25 @@ export default function SocialMediaOSPage() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  const loadBufferStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/social/providers/buffer/status', { cache: 'no-store' })
+      const data = (await response.json()) as BufferProviderStatus
+      setBufferStatus(data)
+    } catch {
+      setBufferStatus({
+        configured: false,
+        provider: 'buffer',
+        error: 'provider_status_unavailable',
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadBufferStatus()
+  }, [loadBufferStatus])
+
 
   const filteredContent = useMemo(
     () => content.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
@@ -170,6 +231,10 @@ export default function SocialMediaOSPage() {
   const filteredRenders = useMemo(
     () => renders.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [renders, selectedBrandId],
+  )
+  const filteredQueue = useMemo(
+    () => queue.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [queue, selectedBrandId],
   )
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
@@ -565,6 +630,92 @@ export default function SocialMediaOSPage() {
     }
   }
 
+  async function enqueueItem(item: ContentItem) {
+    const compatible = filteredAccounts.filter(
+      (account) => account.platform === item.platform && account.status === 'conectada' && !account.paused,
+    )
+    if (!compatible.length) {
+      setError('Nenhuma conta conectada para esta plataforma. Conecte/mapeie a conta antes de enviar para publicação.')
+      return
+    }
+    const account = compatible.length === 1
+      ? compatible[0]
+      : compatible.find((candidate) => window.confirm(`Usar @${candidate.handle} (${candidate.provider || 'buffer'})?`))
+    if (!account) return
+
+    setBusy(true)
+    const { data, error: rpcError } = await supabase.rpc('sm_enqueue_content', {
+      p_content_id: item.id,
+      p_account_id: account.id,
+      p_due_at: item.scheduled_for || new Date().toISOString(),
+    })
+    setBusy(false)
+    if (rpcError) setError(rpcError.message)
+    else {
+      setNotice(`Publicação adicionada à fila com segurança: ${String(data).slice(0, 8)}…`)
+      await loadAll()
+    }
+  }
+
+  async function mapBufferChannel(channelId: string) {
+    if (!selectedBrandId) return
+    setBusy(true)
+    try {
+      const response = await fetch('/api/social/providers/buffer/map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand_id: selectedBrandId, channel_id: channelId }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'buffer_channel_map_failed')
+      setNotice('Canal Buffer mapeado para esta marca.')
+      await Promise.all([loadAll(), loadBufferStatus()])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'buffer_channel_map_failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function dispatchQueue(job: QueueItem) {
+    setBusy(true)
+    try {
+      const response = await fetch('/api/social/publish/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue_id: job.id }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'dispatch_failed')
+      setNotice(`Job enviado ao provider. ID externo: ${data.external_post_id || 'pendente'}`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'dispatch_failed')
+      await loadAll()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function reconcileQueue(job: QueueItem) {
+    setBusy(true)
+    try {
+      const response = await fetch('/api/social/publish/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue_id: job.id }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'reconcile_failed')
+      setNotice(`Reconciliação concluída: ${data.status || 'unknown'}.`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'reconcile_failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function scheduleItem(item: ContentItem) {
     const when = window.prompt('Data/hora ISO para agendar (ex.: 2026-10-01T15:00:00-05:00)')
     if (!when) return
@@ -887,6 +1038,139 @@ export default function SocialMediaOSPage() {
         </section>
 
         <section className={panel}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Contas e fila de publicação</h2>
+              <p className="mt-1 text-xs text-gray-500">Provider-agnostic, com idempotência, tentativas e confirmação externa.</p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{filteredQueue.length} jobs</span>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="font-semibold">Buffer</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {bufferStatus === null
+                    ? 'Verificando provider…'
+                    : bufferStatus.configured
+                      ? 'API server-side configurada.'
+                      : bufferStatus.blocker === 'BUFFER_API_KEY_missing'
+                        ? 'Falta BUFFER_API_KEY no ambiente de produção.'
+                        : 'Provider indisponível.'}
+                </p>
+                {bufferStatus?.error && <p className="mt-1 text-xs text-red-600">{bufferStatus.error}</p>}
+              </div>
+              <button
+                onClick={() => void loadBufferStatus()}
+                className="rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                disabled={busy}
+              >
+                Atualizar provider
+              </button>
+            </div>
+
+            {bufferStatus?.configured && (
+              <div className="mt-4 space-y-3">
+                {(bufferStatus.organizations ?? []).map(({ organization, channels }) => (
+                  <div key={organization.id}>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{organization.name}</p>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {channels.map((channel) => {
+                        const mapped = accounts.some(
+                          (account) =>
+                            (account.provider_channel_id || account.buffer_channel_id) === channel.id &&
+                            account.brand_id === selectedBrandId,
+                        )
+                        return (
+                          <div key={channel.id} className="rounded-lg border bg-white p-3 text-sm">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold">{channel.displayName || channel.name}</p>
+                                <p className="text-xs text-gray-500">{channel.service}</p>
+                              </div>
+                              {mapped ? (
+                                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">Mapeado</span>
+                              ) : (
+                                <button
+                                  onClick={() => void mapBufferChannel(channel.id)}
+                                  disabled={busy || !selectedBrandId}
+                                  className="rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                                >
+                                  Mapear
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Contas da marca</p>
+              {filteredAccounts.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhuma conta social mapeada.</div>
+              ) : filteredAccounts.map((account) => (
+                <div key={account.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div><b>{account.platform}</b> · @{account.handle}</div>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px]">{account.status}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Provider: {account.provider || 'buffer'} · {account.provider_channel_id || account.buffer_channel_id || 'canal não mapeado'}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Fila</p>
+              {filteredQueue.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Fila vazia.</div>
+              ) : filteredQueue.slice(0, 12).map((job) => {
+                const item = content.find((candidate) => candidate.id === job.content_id)
+                return (
+                  <div key={job.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{item?.theme || item?.code || job.content_id}</p>
+                      <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px]">{job.status}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">{new Date(job.due_at).toLocaleString()} · tentativa {job.attempts}/{job.max_attempts}</p>
+                    {job.external_post_id && <p className="mt-1 text-xs text-gray-500">ID externo: {job.external_post_id}</p>}
+                    {job.external_url && <a href={job.external_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600">Ver publicação <ExternalLink size={12}/></a>}
+                    {job.last_error && <p className="mt-2 text-xs text-red-600">{job.last_error}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {['pendente', 'falhou', 'incerto'].includes(job.status) && (
+                        <button
+                          onClick={() => void dispatchQueue(job)}
+                          disabled={busy || !bufferStatus?.configured}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                        >
+                          Despachar
+                        </button>
+                      )}
+                      {job.status === 'enviado_api' && job.external_post_id && (
+                        <button
+                          onClick={() => void reconcileQueue(job)}
+                          disabled={busy || !bufferStatus?.configured}
+                          className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-40"
+                        >
+                          Reconciliar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className={panel}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold">Creative Queue</h2>
@@ -983,8 +1267,20 @@ export default function SocialMediaOSPage() {
                         </>
                       )}
                       {item.status === 'aprovado' && (
-                        <button onClick={() => void scheduleItem(item)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
+                        <button
+                          onClick={() => void scheduleItem(item)}
+                          className="flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700"
+                        >
                           <CalendarDays size={14} /> Agendar
+                        </button>
+                      )}
+                      {(item.status === 'aprovado' || item.status === 'agendado') && (
+                        <button
+                          onClick={() => void enqueueItem(item)}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                          disabled={busy}
+                        >
+                          Enviar à fila
                         </button>
                       )}
                     </div>
@@ -1025,7 +1321,7 @@ export default function SocialMediaOSPage() {
               <div className="flex justify-between"><span>Seleção automática de templates</span><b className="text-emerald-700">Ativa</b></div>
               <div className="flex justify-between"><span>Canva master library</span><b className="text-emerald-700">{filteredTemplates.length ? 'Conectada' : 'Sem templates'}</b></div>
               <div className="flex justify-between"><span>Aprovação e agendamento</span><b className="text-emerald-700">Ativos</b></div>
-              <div className="flex justify-between"><span>Publicação externa</span><b className="text-amber-700">Aguardando integrador conectado</b></div>
+              <div className="flex justify-between"><span>Publicação externa</span><b className={bufferStatus?.configured ? 'text-emerald-700' : 'text-amber-700'}>{bufferStatus?.configured ? 'Buffer configurado' : 'Aguardando BUFFER_API_KEY'}</b></div>
               <div className="flex justify-between"><span>Pesquisa externa automática</span><b className="text-amber-700">Aguardando provedor autorizado</b></div>
             </div>
           </section>
