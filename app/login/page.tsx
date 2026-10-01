@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && !authLoading) {
-      router.push('/')
+      router.replace('/')
       return
     }
     setEmail(localStorage.getItem('saved_email') || '')
@@ -45,9 +45,8 @@ export default function LoginPage() {
           localStorage.removeItem('saved_email')
           localStorage.removeItem('remember_me')
         }
-        await new Promise(resolve => setTimeout(resolve, 500))
         router.refresh()
-        router.push('/')
+        router.replace('/')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during login')
@@ -55,7 +54,7 @@ export default function LoginPage() {
     }
   }
 
-  if (authLoading || user) {
+  if (user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
