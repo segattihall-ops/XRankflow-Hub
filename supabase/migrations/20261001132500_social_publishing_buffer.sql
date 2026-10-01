@@ -164,10 +164,29 @@ as $$
 declare
   q public.sm_queue%rowtype;
   next_status text;
+  final_external_id text;
 begin
   select * into q from public.sm_queue where id=p_queue_id for update;
   if not found then raise exception 'queue_not_found'; end if;
   if not private.sm_can_edit(q.brand_id) then raise exception 'not_allowed'; end if;
+
+  if p_outcome not in ('published','scheduled','unknown','error') then
+    raise exception 'invalid_outcome';
+  end if;
+
+  final_external_id := coalesce(p_external_post_id,q.external_post_id);
+
+  if p_outcome='scheduled' then
+    if q.status <> 'processando' then raise exception 'invalid_transition_to_scheduled'; end if;
+    if final_external_id is null then raise exception 'external_post_id_required'; end if;
+  elsif p_outcome='published' then
+    if q.status <> 'enviado_api' then raise exception 'invalid_transition_to_published'; end if;
+    if final_external_id is null then raise exception 'external_post_id_required'; end if;
+  elsif p_outcome='unknown' then
+    if q.status not in ('processando','enviado_api') then raise exception 'invalid_transition_to_unknown'; end if;
+  elsif p_outcome='error' then
+    if q.status not in ('processando','enviado_api','incerto') then raise exception 'invalid_transition_to_error'; end if;
+  end if;
 
   next_status := case p_outcome
     when 'published' then 'publicado'
@@ -178,7 +197,7 @@ begin
 
   update public.sm_queue
   set status=next_status,
-      external_post_id=coalesce(p_external_post_id,external_post_id),
+      external_post_id=final_external_id,
       external_url=coalesce(p_external_url,external_url),
       last_error=p_error,
       sent_at=case when p_outcome in ('published','scheduled') then now() else sent_at end,
