@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Inbox } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { OperationalState } from '@/components/ui/OperationalState'
 import { supabase } from '@/lib/supabase'
