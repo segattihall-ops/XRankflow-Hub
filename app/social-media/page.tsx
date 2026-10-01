@@ -484,6 +484,23 @@ export default function SocialMediaOSPage() {
     const editUrl = window.prompt('URL de edição da cópia no Canva')
     if (!editUrl) return
     const viewUrl = window.prompt('URL pública/visualização (opcional)') || null
+    const mediaInput = window.prompt(
+      'URLs públicas HTTPS dos arquivos finais, separadas por vírgula (opcional). Use JPG/PNG/WebP para imagem e MP4/MOV/WebM para vídeo.',
+    ) || ''
+    const creativeAssets = mediaInput
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((url) => ({
+        type: /\.(mp4|mov|webm)(\?|#|$)/i.test(url) ? 'video' : 'image',
+        url,
+      }))
+
+    if (creativeAssets.some((asset) => !asset.url.startsWith('https://'))) {
+      setError('Todos os arquivos de mídia precisam usar URL pública HTTPS.')
+      return
+    }
+
     setBusy(true)
     const { error: renderError } = await supabase
       .from('sm_template_renders')
@@ -492,6 +509,10 @@ export default function SocialMediaOSPage() {
         edit_url: editUrl,
         view_url: viewUrl,
         error_message: null,
+        payload: {
+          creative_assets: creativeAssets,
+          completed_at: new Date().toISOString(),
+        },
       })
       .eq('id', render.id)
     const { error: contentError } = await supabase
@@ -502,13 +523,18 @@ export default function SocialMediaOSPage() {
         creative_provider: render.provider,
         creative_edit_url: editUrl,
         creative_view_url: viewUrl,
+        creative_assets: creativeAssets,
       })
       .eq('id', render.content_id)
     setBusy(false)
     if (renderError) setError(renderError.message)
     else if (contentError) setError(contentError.message)
     else {
-      setNotice('Arte marcada como pronta e vinculada ao conteúdo.')
+      setNotice(
+        creativeAssets.length
+          ? `Arte pronta com ${creativeAssets.length} arquivo(s) público(s) vinculados.`
+          : 'Arte marcada como pronta. Nenhum arquivo público de mídia foi informado.',
+      )
       await loadAll()
     }
   }
@@ -1250,6 +1276,11 @@ export default function SocialMediaOSPage() {
                       )}
                       <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{item.caption || 'Sem legenda'}</p>
                       {item.scheduled_for && <p className="mt-2 text-xs text-gray-500">Agendado: {new Date(item.scheduled_for).toLocaleString()}</p>}
+                      {Array.isArray(item.creative_assets) && item.creative_assets.length > 0 && (
+                        <p className="mt-2 text-xs font-medium text-emerald-700">
+                          {item.creative_assets.length} mídia(s) pública(s) pronta(s)
+                        </p>
+                      )}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {item.template_id && (
