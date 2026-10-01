@@ -32,9 +32,7 @@ function normalize(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!sameOrigin(request)) {
-    return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403 })
-  }
+  if (!sameOrigin(request)) return NextResponse.json({ error: 'Origem não permitida.' }, { status: 403 })
 
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 })
@@ -61,11 +59,14 @@ export async function POST(request: NextRequest) {
       .limit(100)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    const overdue = data || []
     return NextResponse.json({
       command,
       generated_at: generatedAt,
       sources: ['wh_tasks'],
-      summary: [\`${(data || []).length} tarefa(s) vencida(s) encontrada(s).\`],\n      result: { overdue_tasks: data || [] },
+      summary: [`${overdue.length} tarefa(s) vencida(s) encontrada(s).`],
+      result: { overdue_tasks: overdue },
     })
   }
 
@@ -88,6 +89,12 @@ export async function POST(request: NextRequest) {
       command,
       generated_at: generatedAt,
       sources: ['wh_tasks','wh_kpis','xrmg_incident_register'],
+      summary: [
+        `${overdue.length} tarefa(s) vencida(s).`,
+        `${highPriority.length} tarefa(s) abertas de alta prioridade.`,
+        `${riskKpis.length} KPI(s) em risco.`,
+        `${activeIncidents.length} incidente(s) ativo(s).`,
+      ],
       result: {
         overdue_tasks: overdue,
         high_priority_tasks: highPriority,
@@ -110,12 +117,18 @@ export async function POST(request: NextRequest) {
       ...check,
       freshness: new Date(check.expires_at).getTime() <= now ? 'stale' : 'current',
     }))
+    const staleCount = checks.filter(check => check.freshness === 'stale').length
     const activeIncidents = (incidentsRes.data || []).filter(i => !['closed','resolved','done'].includes(String(i.status).toLowerCase()))
 
     return NextResponse.json({
       command,
       generated_at: generatedAt,
       sources: ['xrmg_system_checks','xrmg_incident_register'],
+      summary: [
+        `${checks.length - staleCount} check(s) atual(is).`,
+        `${staleCount} check(s) stale.`,
+        `${activeIncidents.length} incidente(s) ativo(s).`,
+      ],
       result: { checks, active_incidents: activeIncidents },
     })
   }
@@ -139,24 +152,23 @@ export async function POST(request: NextRequest) {
     if (first) return NextResponse.json({ error: first.message }, { status: 400 })
 
     const tasks = tasksRes.data || []
+    const projects = projectsRes.data || []
     const kpis = kpisRes.data || []
+    const openTasks = tasks.filter(t => t.status !== 'Done')
+    const overdueTasks = openTasks.filter(t => t.due_date && t.due_date < today)
+    const riskKpis = kpis.filter(k => k.health === 'At Risk' || k.health === 'Off Track')
 
     return NextResponse.json({
       command,
       generated_at: generatedAt,
       sources: ['wh_brands','wh_tasks','wh_projects','wh_kpis'],
-      result: {
-        brand,
-        summary: {
-          open_tasks: tasks.filter(t => t.status !== 'Done').length,
-          overdue_tasks: tasks.filter(t => t.status !== 'Done' && t.due_date && t.due_date < today).length,
-          projects: (projectsRes.data || []).length,
-          kpis_at_risk: kpis.filter(k => k.health === 'At Risk' || k.health === 'Off Track').length,
-        },
-        tasks,
-        projects: projectsRes.data || [],
-        kpis,
-      },
+      summary: [
+        `${openTasks.length} tarefa(s) aberta(s).`,
+        `${overdueTasks.length} tarefa(s) vencida(s).`,
+        `${projects.length} projeto(s).`,
+        `${riskKpis.length} KPI(s) em risco.`,
+      ],
+      result: { brand, tasks, projects, kpis },
     })
   }
 
@@ -171,6 +183,11 @@ export async function POST(request: NextRequest) {
     command,
     generated_at: generatedAt,
     sources: ['lib/source-registry.ts'],
-    summary: [\n      \`Estado: ${sourceStateLabel(source.state)}.\`,\n      \`Autoridade: ${source.authority}\`,\n      \`${source.supportedActions.length} capacidade(s) declarada(s) como disponível(is).\`,\n    ],\n    result: { source },
+    summary: [
+      `Estado: ${sourceStateLabel(source.state)}.`,
+      `Autoridade: ${source.authority}`,
+      `${source.supportedActions.length} capacidade(s) declarada(s) como disponível(is).`,
+    ],
+    result: { source },
   })
 }
