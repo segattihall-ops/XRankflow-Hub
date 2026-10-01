@@ -19,21 +19,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    let active = true
+
+    // Never allow a broken/slow session bootstrap to leave the entire app
+    // permanently stuck behind a loading screen.
+    const fallback = window.setTimeout(() => {
+      if (active) setLoading(false)
+    }, 5000)
+
+    const loadSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (!active) return
+
+        if (error) {
+          setSession(null)
+          setUser(null)
+        } else {
+          setSession(data.session)
+          setUser(data.session?.user ?? null)
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    void loadSession()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return
+      setSession(nextSession)
+      setUser(nextSession?.user ?? null)
       setLoading(false)
     })
 
-    return () => subscription?.unsubscribe()
+    return () => {
+      active = false
+      window.clearTimeout(fallback)
+      subscription?.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
