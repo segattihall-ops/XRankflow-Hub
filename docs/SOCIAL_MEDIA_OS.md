@@ -133,3 +133,24 @@ Publishing safety:
 ### Current external blocker
 
 If `BUFFER_API_KEY` is absent from the Vercel environment, the dashboard displays the blocker and dispatch buttons remain disabled. No post is consumed from the queue in that state.
+
+
+## Media dispatch
+
+Creative content can now store ordered public media in `sm_content.creative_assets`.
+
+Each asset is structured as:
+- `type: image | video`
+- `url: public HTTPS URL`
+- optional `thumbnailOffset` for video
+
+Rules:
+- Buffer must be able to fetch the URL without authentication.
+- The OS rejects localhost/private-network and non-HTTPS media URLs.
+- Instagram and TikTok require at least one media asset.
+- Instagram `video_curto` requires a video asset and is dispatched as a Reel.
+- Instagram carousels can carry multiple ordered image assets.
+- Text-capable networks may optionally include media.
+- Pinterest and YouTube remain blocked until their required channel-specific metadata is collected and validated.
+
+Canva edit/view links are not treated as publishable media files unless they resolve to a direct, public file URL. The Creative Queue records direct media URLs separately.
