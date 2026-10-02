@@ -230,3 +230,42 @@ export async function findBufferPost(input: {
 
   return data.posts?.edges?.map((edge) => edge.node).find((post) => post?.id === input.postId) ?? null
 }
+
+
+export type BufferPostMetric = {
+  type: string
+  name?: string | null
+  value: number
+  unit?: string | null
+}
+
+export type BufferPostMetricsResult = {
+  id: string
+  channelId?: string | null
+  externalLink?: string | null
+  metrics?: BufferPostMetric[] | null
+  metricsUpdatedAt?: string | null
+}
+
+export async function getBufferPostMetrics(postId: string): Promise<BufferPostMetricsResult | null> {
+  const data = await bufferGraphQL<{
+    post?: BufferPostMetricsResult | null
+  }>(`
+    query GetPostMetrics {
+      post(input: { id: ${q(postId)} }) {
+        id
+        channelId
+        externalLink
+        metrics {
+          type
+          name
+          value
+          unit
+        }
+        metricsUpdatedAt
+      }
+    }
+  `)
+
+  return data.post ?? null
+}
