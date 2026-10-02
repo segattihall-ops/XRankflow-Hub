@@ -62,6 +62,61 @@ interface Api {
   remove(id: string): Promise<void>;
 }
 
+type GraphQLError = {
+  message?: string;
+  extensions?: { code?: string };
+};
+
+type GraphQLResponse<T> = {
+  data?: T;
+  errors?: GraphQLError[];
+};
+
+type BufferOrganization = {
+  id: string;
+  name: string;
+};
+
+type BufferAccountData = {
+  id?: string;
+  email?: string;
+  name?: string;
+  organizations?: BufferOrganization[];
+};
+
+type BufferChannelData = {
+  id: string;
+  name: string;
+  displayName?: string | null;
+  service: string;
+  type?: string | null;
+  isDisconnected?: boolean;
+  isLocked?: boolean;
+  isQueuePaused?: boolean;
+  externalLink?: string | null;
+  avatar?: string | null;
+};
+
+type BufferPostEdge = {
+  node: {
+    id: string;
+    text?: string | null;
+    dueAt?: string | null;
+    status?: string | null;
+  };
+};
+
+type BufferMetricData = {
+  type: string;
+  name?: string | null;
+  value: number;
+  unit?: string | null;
+};
+
+type BufferAssetInput =
+  | { image: { url: string } }
+  | { video: { url: string; metadata?: { thumbnailOffset: number } } };
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -79,7 +134,11 @@ function retryFromHeaders(res: Response): number {
   return wait || 900;
 }
 
-async function gql(key: string, query: string, variables: Record<string, unknown>) {
+async function gql<T>(
+  key: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T> {
   let res: Response;
   try {
     res = await fetch(BUFFER_URL, {
@@ -96,15 +155,15 @@ async function gql(key: string, query: string, variables: Record<string, unknown
   if (res.status === 401 || res.status === 403) throw new BufferError("auth", "Chave do Buffer recusada");
   if (res.status >= 500) throw new BufferError("server", `Buffer respondeu ${res.status}`);
 
-  let body: any;
+  let body: GraphQLResponse<T>;
   try {
-    body = await res.json();
+    body = (await res.json()) as GraphQLResponse<T>;
   } catch {
     throw new BufferError("network", "Resposta ilegível do Buffer");
   }
 
-  if (body?.errors?.length) {
-    const msg = body.errors.map((e: any) => e.message).join("; ");
+  if (body.errors?.length) {
+    const msg = body.errors.map((error) => error.message ?? "Buffer GraphQL error").join("; ");
     const code = String(body.errors[0]?.extensions?.code ?? "");
     if (/unauth|forbidden|invalid.*(token|key)|api key/i.test(msg + " " + code)) {
       throw new BufferError("auth", msg);
@@ -113,6 +172,9 @@ async function gql(key: string, query: string, variables: Record<string, unknown
       throw new BufferError("rate", msg, retryFromHeaders(res));
     }
     throw new BufferError("server", msg);
+  }
+  if (body.data === undefined) {
+    throw new BufferError("server", "Resposta do Buffer sem campo data");
   }
   return body.data;
 }
@@ -137,12 +199,16 @@ async function getConnection(connectionId: string): Promise<{ connection: Connec
 
 async function verifyConnection(connectionId: string) {
   const { connection, key } = await getConnection(connectionId);
-  const data = await gql(key, "query { account { id email name organizations { id name } } }", {});
+  const data = await gql<{ account?: BufferAccountData }>(
+    key,
+    "query { account { id email name organizations { id name } } }",
+    {},
+  );
   const account = data?.account;
   const orgs = account?.organizations ?? [];
 
   let org = connection.organization_id
-    ? orgs.find((item: any) => item.id === connection.organization_id)
+    ? orgs.find((item) => item.id === connection.organization_id)
     : null;
 
   if (!org && orgs.length === 1) org = orgs[0];
@@ -153,7 +219,10 @@ async function verifyConnection(connectionId: string) {
       p_external_account_id: account?.id ?? null,
       p_organization_id: null,
       p_error: "Organização Buffer não encontrada ou ambígua",
-      p_meta: { account_email: account?.email ?? null, organizations: orgs.map((o: any) => ({ id: o.id, name: o.name })) },
+      p_meta: {
+        account_email: account?.email ?? null,
+        organizations: orgs.map((organization) => ({ id: organization.id, name: organization.name })),
+      },
     });
     throw new BufferError("mutation", "A organização configurada não pertence a esta chave Buffer");
   }
@@ -167,7 +236,7 @@ async function verifyConnection(connectionId: string) {
     p_meta: { account_email: account?.email ?? null, account_name: account?.name ?? null, organization_name: org.name },
   });
 
-  const channelsData = await gql(
+  const channelsData = await gql<{ channels?: BufferChannelData[] }>(
     key,
     `query($input: ChannelsInput!) {
       channels(input: $input) {
@@ -230,10 +299,10 @@ async function verifyConnection(connectionId: string) {
 }
 
 function buildAssets(row: Row) {
-  const assets: any[] = [];
+  const assets: BufferAssetInput[] = [];
   for (const item of row.creative_assets ?? []) {
     if (!item?.url || !/^https:\/\//i.test(item.url)) continue;
-    if (item.type === "video") {
+    if (itemetric.type === "video") {
       assets.push({
         video: {
           url: item.url,
@@ -242,7 +311,7 @@ function buildAssets(row: Row) {
             : {}),
         },
       });
-    } else if (item.type === "image") {
+    } else if (itemetric.type === "image") {
       assets.push({ image: { url: item.url } });
     }
   }
@@ -295,7 +364,9 @@ function realApi(key: string, organizationId: string | null): Api {
         input.metadata = { tiktok: {} };
       }
 
-      const data = await gql(
+      const data = await gql<{
+        createPost?: { post?: { id: string; dueAt?: string | null; status?: string | null }; message?: string };
+      }>(
         key,
         `mutation($input: CreatePostInput!) {
           createPost(input: $input) {
@@ -314,7 +385,7 @@ function realApi(key: string, organizationId: string | null): Api {
     async find(row) {
       if (!organizationId) throw new BufferError("mutation", "Organização Buffer não configurada");
       const due = new Date(row.due_at).getTime();
-      const data = await gql(
+      const data = await gql<{ posts?: { edges?: BufferPostEdge[] } }>(
         key,
         `query($input: PostsInput!) {
           posts(first: 50, input: $input) {
@@ -335,14 +406,21 @@ function realApi(key: string, organizationId: string | null): Api {
           },
         },
       );
-      const hit = (data?.posts?.edges ?? []).find(
-        (e: any) => (e.node.text ?? "").trim() === row.post_text.trim(),
+      const hit = (data.posts?.edges ?? []).find(
+        (edge) => (edge.node.text ?? "").trim() === row.post_text.trim(),
       );
       return hit ? { id: hit.node.id } : null;
     },
 
     async status(id) {
-      const data = await gql(
+      const data = await gql<{
+        post?: {
+          id: string;
+          status?: string | null;
+          externalLink?: string | null;
+          error?: { message?: string | null } | null;
+        };
+      }>(
         key,
         `query($input: PostInput!) {
           post(input: $input) { id status externalLink error { message } }
@@ -358,7 +436,7 @@ function realApi(key: string, organizationId: string | null): Api {
     },
 
     async remove(id) {
-      const data = await gql(
+      const data = await gql<{ deletePost?: { __typename?: string } }>(
         key,
         `mutation($input: DeletePostInput!) {
           deletePost(input: $input) { __typename }
@@ -594,7 +672,13 @@ async function runMetrics() {
         keyCache.set(row.provider_connection_id, key);
       }
 
-      const d = await gql(
+      const d = await gql<{
+        post?: {
+          externalLink?: string | null;
+          metrics?: BufferMetricData[] | null;
+          metricsUpdatedAt?: string | null;
+        };
+      }>(
         key,
         `query($input: PostInput!) {
           post(input: $input) {
@@ -664,15 +748,15 @@ async function runMetrics() {
 
       const collectedOn = String(post.metricsUpdatedAt).slice(0, 10);
       const metricRows = post.metrics
-        .filter((m: any) => Number.isFinite(Number(m.value)))
-        .map((m: any) => ({
+        .filter((metric) => Number.isFinite(Number(metric.value)))
+        .map((metric) => ({
           queue_id: row.queue_id,
           content_id: q.content_id,
           brand_id: q.brand_id,
-          metric_type: m.type,
-          metric_name: m.name ?? null,
-          value: Number(m.value),
-          unit: m.unit ?? null,
+          metric_type: metric.type,
+          metric_name: metric.name ?? null,
+          value: Number(metric.value),
+          unit: metric.unit ?? null,
           collected_on: collectedOn,
           source: "buffer",
           metrics_updated_at: post.metricsUpdatedAt,
