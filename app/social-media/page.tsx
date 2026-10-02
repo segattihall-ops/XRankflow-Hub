@@ -96,6 +96,31 @@ type BufferProviderStatus = {
   }>
 }
 
+type MetricRow = {
+  id: number
+  queue_id: string
+  content_id: string
+  brand_id: string
+  metric_type: string
+  metric_name?: string | null
+  value: number
+  unit?: string | null
+  collected_on: string
+  source?: string | null
+  metrics_updated_at?: string | null
+}
+
+type MetricSync = {
+  queue_id: string
+  content_id: string
+  brand_id: string
+  provider: string
+  status: 'pending' | 'observed' | 'no_data' | 'error'
+  metrics_updated_at?: string | null
+  last_synced_at: string
+  last_error?: string | null
+}
+
 type CreativeRender = {
   id: string
   brand_id: string
@@ -134,6 +159,8 @@ export default function SocialMediaOSPage() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [renders, setRenders] = useState<CreativeRender[]>([])
   const [queue, setQueue] = useState<QueueItem[]>([])
+  const [metrics, setMetrics] = useState<MetricRow[]>([])
+  const [metricSyncs, setMetricSyncs] = useState<MetricSync[]>([])
   const [bufferStatus, setBufferStatus] = useState<BufferProviderStatus | null>(null)
   const [workerStatus, setWorkerStatus] = useState<{
     ready: boolean
@@ -159,7 +186,7 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, templatesRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, metricsRes, metricSyncsRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
@@ -168,9 +195,11 @@ export default function SocialMediaOSPage() {
       supabase.from('sm_brand_assets').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_template_renders').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_queue').select('*').order('created_at', { ascending: false }).limit(250),
+      supabase.from('sm_metrics').select('*').order('collected_at', { ascending: false }).limit(500),
+      supabase.from('sm_metric_syncs').select('*').order('last_synced_at', { ascending: false }).limit(250),
       supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || templatesRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || metricsRes.error || metricSyncsRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -185,6 +214,8 @@ export default function SocialMediaOSPage() {
     setAssets((assetsRes.data ?? []) as Asset[])
     setRenders((rendersRes.data ?? []) as CreativeRender[])
     setQueue((queueRes.data ?? []) as QueueItem[])
+    setMetrics((metricsRes.data ?? []) as MetricRow[])
+    setMetricSyncs((metricSyncsRes.data ?? []) as MetricSync[])
     setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
@@ -261,6 +292,32 @@ export default function SocialMediaOSPage() {
     () => queue.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [queue, selectedBrandId],
   )
+  const filteredMetrics = useMemo(
+    () => metrics.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [metrics, selectedBrandId],
+  )
+  const filteredMetricSyncs = useMemo(
+    () => metricSyncs.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [metricSyncs, selectedBrandId],
+  )
+  const performanceSummary = useMemo(() => {
+    const latestByMetric = new Map<string, MetricRow>()
+    for (const metric of filteredMetrics) {
+      const key = `${metric.content_id}:${metric.metric_type}`
+      const current = latestByMetric.get(key)
+      if (!current || metric.collected_on > current.collected_on) latestByMetric.set(key, metric)
+    }
+
+    const totals = new Map<string, number>()
+    for (const metric of latestByMetric.values()) {
+      totals.set(metric.metric_type, (totals.get(metric.metric_type) || 0) + Number(metric.value || 0))
+    }
+
+    return Array.from(totals.entries())
+      .map(([type, value]) => ({ type, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8)
+  }, [filteredMetrics])
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
     [templates],
@@ -1347,6 +1404,70 @@ export default function SocialMediaOSPage() {
           )}
         </section>
 
+        <section className={panel}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-blue-600" />
+                <h2 className="text-lg font-bold">Métricas observadas</h2>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Dados reais do provider. Ausência de dados nunca é tratada como zero.
+              </p>
+            </div>
+            <div className="text-xs text-gray-500">
+              {filteredMetricSyncs.filter((item) => item.status === 'observed').length} posts com métricas
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {performanceSummary.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500 md:col-span-2 xl:col-span-4">
+                Ainda não há métricas observadas para esta marca.
+              </div>
+            ) : performanceSummary.map((metric) => (
+              <div key={metric.type} className="rounded-xl border p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500">{metric.type}</p>
+                <p className="mt-2 text-2xl font-bold">{metric.value.toLocaleString()}</p>
+                <p className="mt-1 text-[11px] text-gray-400">Soma do snapshot mais recente por conteúdo</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            {(['observed', 'pending', 'no_data', 'error'] as const).map((status) => (
+              <div key={status} className="rounded-lg bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">{status}</p>
+                <p className="mt-1 text-xl font-bold">{filteredMetricSyncs.filter((item) => item.status === status).length}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 space-y-2">
+            {filteredMetricSyncs.slice(0, 10).map((sync) => {
+              const item = content.find((candidate) => candidate.id === sync.content_id)
+              return (
+                <div key={sync.queue_id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-semibold">{item?.theme || item?.code || sync.content_id}</p>
+                      <p className="text-xs text-gray-500">
+                        {sync.provider} · {sync.status} · última sincronização {new Date(sync.last_synced_at).toLocaleString()}
+                      </p>
+                    </div>
+                    {sync.metrics_updated_at && (
+                      <span className="text-xs text-gray-500">
+                        Provider atualizado {new Date(sync.metrics_updated_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  {sync.last_error && <p className="mt-2 text-xs text-red-600">{sync.last_error}</p>}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
         <div className="grid gap-6 lg:grid-cols-2">
           <section className={panel}>
             <div className="flex items-center gap-2">
@@ -1387,6 +1508,7 @@ export default function SocialMediaOSPage() {
                   {!workerStatus.checks.buffer_api_key ? ' BUFFER_API_KEY' : ''}
                 </div>
               )}
+              <div className="flex justify-between"><span>Métricas do provider</span><b className={filteredMetricSyncs.some((item) => item.status === 'observed') ? 'text-emerald-700' : 'text-amber-700'}>{filteredMetricSyncs.some((item) => item.status === 'observed') ? 'Dados observados' : 'Aguardando publicação + provider'}</b></div>
               <div className="flex justify-between"><span>Pesquisa externa automática</span><b className="text-amber-700">Aguardando provedor autorizado</b></div>
             </div>
           </section>

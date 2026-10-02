@@ -154,3 +154,29 @@ Rules:
 - Pinterest and YouTube remain blocked until their required channel-specific metadata is collected and validated.
 
 Canva edit/view links are not treated as publishable media files unless they resolve to a direct, public file URL. The Creative Queue records direct media URLs separately.
+
+
+## Metrics and optimization
+
+Buffer post metrics are synchronized from the provider instead of inferred locally.
+
+Data quality rules:
+- `observed`: the provider returned one or more metric values.
+- `pending`: Buffer has not populated `metricsUpdatedAt`/metrics yet.
+- `no_data`: the provider returned an explicit empty metric set.
+- `error`: the provider request failed or the post could not be resolved.
+- Missing data is never converted to zero.
+
+Storage:
+- `sm_metrics` stores observed metric snapshots at the provider's `metricsUpdatedAt` date.
+- `sm_metric_syncs` stores freshness and sync health per published queue item.
+- Client users have read-only access through brand-scoped RLS.
+- Writes are performed by the server-side metrics worker.
+
+Automation:
+- `/api/cron/social-metrics` runs daily at `14:15 UTC`.
+- The worker considers published posts from the last 90 days and prioritizes the least recently synchronized items.
+- Up to 30 posts are refreshed per run.
+- Buffer metrics can be delayed by roughly 24 hours, so the UI shows provider freshness separately from local sync time.
+
+The dashboard aggregates only the latest observed snapshot per content/metric type and labels the result as an observed summary, not a causal performance conclusion.
