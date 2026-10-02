@@ -75,25 +75,27 @@ type QueueItem = {
   last_error?: string | null
 }
 
-type BufferProviderStatus = {
-  configured: boolean
-  provider?: string
-  blocker?: string
-  error?: string
-  organizations?: Array<{
-    organization: { id: string; name: string }
-    channels: Array<{
-      id: string
-      name: string
-      displayName?: string | null
-      service: string
-      avatar?: string | null
-      isQueuePaused?: boolean
-      isDisconnected?: boolean
-      isLocked?: boolean
-      externalLink?: string | null
-    }>
-  }>
+type ProviderConnection = {
+  id: string
+  brand_id: string
+  provider: string
+  label: string
+  organization_id?: string | null
+  external_account_id?: string | null
+  status: 'needs_key' | 'configured' | 'verified' | 'error' | 'disabled'
+  last_verified_at?: string | null
+  last_error?: string | null
+  meta: Record<string, unknown>
+}
+
+type SupabaseWorkerStatus = {
+  cron_secret?: boolean
+  publisher_cron?: boolean
+  metrics_cron?: boolean
+  connections_total?: number
+  connections_verified?: number
+  connections_needing_key?: number
+  connections_error?: number
 }
 
 type MetricRow = {
@@ -161,16 +163,8 @@ export default function SocialMediaOSPage() {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [metrics, setMetrics] = useState<MetricRow[]>([])
   const [metricSyncs, setMetricSyncs] = useState<MetricSync[]>([])
-  const [bufferStatus, setBufferStatus] = useState<BufferProviderStatus | null>(null)
-  const [workerStatus, setWorkerStatus] = useState<{
-    ready: boolean
-    checks: {
-      cron_secret: boolean
-      supabase_service_role: boolean
-      buffer_api_key: boolean
-    }
-    schedule: string
-  } | null>(null)
+  const [connections, setConnections] = useState<ProviderConnection[]>([])
+  const [workerStatus, setWorkerStatus] = useState<SupabaseWorkerStatus | null>(null)
   const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -186,7 +180,7 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, metricsRes, metricSyncsRes, templatesRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, metricsRes, metricSyncsRes, connectionsRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
@@ -197,9 +191,10 @@ export default function SocialMediaOSPage() {
       supabase.from('sm_queue').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_metrics').select('*').order('collected_at', { ascending: false }).limit(500),
       supabase.from('sm_metric_syncs').select('*').order('last_synced_at', { ascending: false }).limit(250),
+      supabase.from('sm_provider_connections').select('*').order('created_at', { ascending: true }),
       supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || metricsRes.error || metricSyncsRes.error || templatesRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || metricsRes.error || metricSyncsRes.error || connectionsRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -216,6 +211,7 @@ export default function SocialMediaOSPage() {
     setQueue((queueRes.data ?? []) as QueueItem[])
     setMetrics((metricsRes.data ?? []) as MetricRow[])
     setMetricSyncs((metricSyncsRes.data ?? []) as MetricSync[])
+    setConnections((connectionsRes.data ?? []) as ProviderConnection[])
     setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
@@ -225,33 +221,13 @@ export default function SocialMediaOSPage() {
     void loadAll()
   }, [loadAll])
 
-  const loadBufferStatus = useCallback(async () => {
-    try {
-      const response = await fetch('/api/social/providers/buffer/status', { cache: 'no-store' })
-      const data = (await response.json()) as BufferProviderStatus
-      setBufferStatus(data)
-    } catch {
-      setBufferStatus({
-        configured: false,
-        provider: 'buffer',
-        error: 'provider_status_unavailable',
-      })
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadBufferStatus()
-  }, [loadBufferStatus])
-
   const loadWorkerStatus = useCallback(async () => {
-    try {
-      const response = await fetch('/api/social/worker/status', { cache: 'no-store' })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'worker_status_failed')
-      setWorkerStatus(data)
-    } catch {
+    const { data, error: statusError } = await supabase.rpc('sm_worker_status')
+    if (statusError) {
       setWorkerStatus(null)
+      return
     }
+    setWorkerStatus((data ?? {}) as SupabaseWorkerStatus)
   }, [])
 
   useEffect(() => {
@@ -299,6 +275,10 @@ export default function SocialMediaOSPage() {
   const filteredMetricSyncs = useMemo(
     () => metricSyncs.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [metricSyncs, selectedBrandId],
+  )
+  const filteredConnections = useMemo(
+    () => connections.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [connections, selectedBrandId],
   )
   const performanceSummary = useMemo(() => {
     const latestByMetric = new Map<string, MetricRow>()
@@ -765,60 +745,91 @@ export default function SocialMediaOSPage() {
     }
   }
 
-  async function mapBufferChannel(channelId: string) {
-    if (!selectedBrandId) return
+  async function configureBufferConnection(connection: ProviderConnection) {
+    const apiKey = window.prompt(
+      `Cole a API key do Buffer para "${connection.label}". Ela será enviada diretamente ao Supabase Vault e não ficará salva no navegador.`,
+    )
+    if (!apiKey?.trim()) return
+
     setBusy(true)
+    setError('')
     try {
-      const response = await fetch('/api/social/providers/buffer/map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brand_id: selectedBrandId, channel_id: channelId }),
+      const { data: connectionId, error: saveError } = await supabase.rpc('sm_upsert_buffer_connection', {
+        p_brand: connection.brand_id,
+        p_label: connection.label,
+        p_organization_id: connection.organization_id || '',
+        p_api_key: apiKey.trim(),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'buffer_channel_map_failed')
-      setNotice('Canal Buffer mapeado para esta marca.')
-      await Promise.all([loadAll(), loadBufferStatus()])
+      if (saveError) throw saveError
+
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'verify_connection', connectionId },
+      })
+      if (verifyError) throw verifyError
+      if (verifyData?.ok === false || verifyData?.error) {
+        throw new Error(verifyData?.error || 'Falha ao verificar conexão Buffer')
+      }
+
+      setNotice(`Buffer verificado: ${verifyData?.account?.email || connection.label}. Canais sincronizados automaticamente.`)
+      await Promise.all([loadAll(), loadWorkerStatus()])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'buffer_channel_map_failed')
+      setError(err instanceof Error ? err.message : 'Falha ao configurar Buffer')
+      await Promise.all([loadAll(), loadWorkerStatus()])
     } finally {
       setBusy(false)
     }
   }
 
-  async function dispatchQueue(job: QueueItem) {
+  async function verifyBufferConnection(connection: ProviderConnection) {
     setBusy(true)
+    setError('')
     try {
-      const response = await fetch('/api/social/publish/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queue_id: job.id }),
+      const { data, error: verifyError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'verify_connection', connectionId: connection.id },
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'dispatch_failed')
-      setNotice(`Job enviado ao provider. ID externo: ${data.external_post_id || 'pendente'}`)
-      await loadAll()
+      if (verifyError) throw verifyError
+      if (data?.ok === false || data?.error) throw new Error(data?.error || 'Falha ao verificar Buffer')
+      setNotice(`Conexão verificada e ${data?.channels?.length || 0} canal(is) sincronizado(s).`)
+      await Promise.all([loadAll(), loadWorkerStatus()])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'dispatch_failed')
-      await loadAll()
+      setError(err instanceof Error ? err.message : 'Falha ao verificar Buffer')
+      await Promise.all([loadAll(), loadWorkerStatus()])
     } finally {
       setBusy(false)
     }
   }
 
-  async function reconcileQueue(job: QueueItem) {
+  async function runPublisherNow() {
     setBusy(true)
+    setError('')
     try {
-      const response = await fetch('/api/social/publish/reconcile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queue_id: job.id }),
+      const { data, error: runError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'run' },
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'reconcile_failed')
-      setNotice(`Reconciliação concluída: ${data.status || 'unknown'}.`)
+      if (runError) throw runError
+      if (data?.ok === false || data?.error) throw new Error(data?.error || 'Falha no publicador')
+      setNotice(`Worker executado: ${data?.claimed ?? 0} item(ns) processado(s).`)
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'reconcile_failed')
+      setError(err instanceof Error ? err.message : 'Falha ao executar worker')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function runMetricsNow() {
+    setBusy(true)
+    setError('')
+    try {
+      const { data, error: runError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'metrics' },
+      })
+      if (runError) throw runError
+      if (data?.ok === false || data?.error) throw new Error(data?.error || 'Falha na sincronização de métricas')
+      setNotice(`Métricas sincronizadas: ${data?.observed ?? 0} observadas; ${data?.pending ?? 0} pendentes.`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao sincronizar métricas')
     } finally {
       setBusy(false)
     }
@@ -1154,69 +1165,74 @@ export default function SocialMediaOSPage() {
             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{filteredQueue.length} jobs</span>
           </div>
 
-          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="font-semibold">Buffer</p>
+                <p className="font-semibold">Conexões Buffer desta marca</p>
                 <p className="mt-1 text-xs text-gray-500">
-                  {bufferStatus === null
-                    ? 'Verificando provider…'
-                    : bufferStatus.configured
-                      ? 'API server-side configurada.'
-                      : bufferStatus.blocker === 'BUFFER_API_KEY_missing'
-                        ? 'Falta BUFFER_API_KEY no ambiente de produção.'
-                        : 'Provider indisponível.'}
+                  As chaves ficam criptografadas no Supabase Vault. O navegador nunca recupera o valor salvo.
                 </p>
-                {bufferStatus?.error && <p className="mt-1 text-xs text-red-600">{bufferStatus.error}</p>}
               </div>
               <button
-                onClick={() => void loadBufferStatus()}
-                className="rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
-                disabled={busy}
+                onClick={() => void runPublisherNow()}
+                disabled={busy || !filteredConnections.some((item) => item.status === 'verified')}
+                className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
               >
-                Atualizar provider
+                Processar fila agora
               </button>
             </div>
 
-            {bufferStatus?.configured && (
-              <div className="mt-4 space-y-3">
-                {(bufferStatus.organizations ?? []).map(({ organization, channels }) => (
-                  <div key={organization.id}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{organization.name}</p>
-                    <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                      {channels.map((channel) => {
-                        const mapped = accounts.some(
-                          (account) =>
-                            (account.provider_channel_id || account.buffer_channel_id) === channel.id &&
-                            account.brand_id === selectedBrandId,
-                        )
-                        return (
-                          <div key={channel.id} className="rounded-lg border bg-white p-3 text-sm">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="font-semibold">{channel.displayName || channel.name}</p>
-                                <p className="text-xs text-gray-500">{channel.service}</p>
-                              </div>
-                              {mapped ? (
-                                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">Mapeado</span>
-                              ) : (
-                                <button
-                                  onClick={() => void mapBufferChannel(channel.id)}
-                                  disabled={busy || !selectedBrandId}
-                                  className="rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
-                                >
-                                  Mapear
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
+            {filteredConnections.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">
+                Nenhuma conexão Buffer cadastrada para esta marca.
               </div>
-            )}
+            ) : filteredConnections.map((connection) => (
+              <div key={connection.id} className="rounded-xl border bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">{connection.label}</p>
+                      <span className={
+                        connection.status === 'verified'
+                          ? 'rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700'
+                          : connection.status === 'error'
+                            ? 'rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700'
+                            : 'rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700'
+                      }>
+                        {connection.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Organização: {connection.organization_id || 'será detectada automaticamente'}
+                    </p>
+                    {connection.last_verified_at && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Verificada {new Date(connection.last_verified_at).toLocaleString()}
+                      </p>
+                    )}
+                    {connection.last_error && <p className="mt-2 text-xs text-red-600">{connection.last_error}</p>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => void configureBufferConnection(connection)}
+                      disabled={busy}
+                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {connection.status === 'needs_key' ? 'Adicionar API key' : 'Substituir API key'}
+                    </button>
+                    {connection.status !== 'needs_key' && (
+                      <button
+                        onClick={() => void verifyBufferConnection(connection)}
+                        disabled={busy}
+                        className="rounded-lg border bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      >
+                        Verificar + sincronizar canais
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -1252,22 +1268,13 @@ export default function SocialMediaOSPage() {
                     {job.external_url && <a href={job.external_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600">Ver publicação <ExternalLink size={12}/></a>}
                     {job.last_error && <p className="mt-2 text-xs text-red-600">{job.last_error}</p>}
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {['pendente', 'falhou', 'incerto'].includes(job.status) && (
+                      {['pendente', 'falhou', 'incerto', 'enviado_api'].includes(job.status) && (
                         <button
-                          onClick={() => void dispatchQueue(job)}
-                          disabled={busy || !bufferStatus?.configured}
-                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
-                        >
-                          Despachar
-                        </button>
-                      )}
-                      {job.status === 'enviado_api' && job.external_post_id && (
-                        <button
-                          onClick={() => void reconcileQueue(job)}
-                          disabled={busy || !bufferStatus?.configured}
+                          onClick={() => void runPublisherNow()}
+                          disabled={busy || !filteredConnections.some((item) => item.status === 'verified')}
                           className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-40"
                         >
-                          Reconciliar
+                          Processar worker
                         </button>
                       )}
                     </div>
@@ -1415,8 +1422,17 @@ export default function SocialMediaOSPage() {
                 Dados reais do provider. Ausência de dados nunca é tratada como zero.
               </p>
             </div>
-            <div className="text-xs text-gray-500">
-              {filteredMetricSyncs.filter((item) => item.status === 'observed').length} posts com métricas
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-gray-500">
+                {filteredMetricSyncs.filter((item) => item.status === 'observed').length} posts com métricas
+              </div>
+              <button
+                onClick={() => void runMetricsNow()}
+                disabled={busy || !filteredConnections.some((item) => item.status === 'verified')}
+                className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              >
+                Sincronizar agora
+              </button>
             </div>
           </div>
 
@@ -1498,14 +1514,12 @@ export default function SocialMediaOSPage() {
               <div className="flex justify-between"><span>Seleção automática de templates</span><b className="text-emerald-700">Ativa</b></div>
               <div className="flex justify-between"><span>Canva master library</span><b className="text-emerald-700">{filteredTemplates.length ? 'Conectada' : 'Sem templates'}</b></div>
               <div className="flex justify-between"><span>Aprovação e agendamento</span><b className="text-emerald-700">Ativos</b></div>
-              <div className="flex justify-between"><span>Publicação externa</span><b className={bufferStatus?.configured ? 'text-emerald-700' : 'text-amber-700'}>{bufferStatus?.configured ? 'Buffer configurado' : 'Aguardando BUFFER_API_KEY'}</b></div>
-              <div className="flex justify-between gap-4"><span>Worker automático</span><b className={workerStatus?.ready ? 'text-emerald-700' : 'text-amber-700'}>{workerStatus?.ready ? 'Ativo a cada 5 min' : 'Aguardando secrets'}</b></div>
-              {workerStatus && !workerStatus.ready && (
+              <div className="flex justify-between"><span>Publicação externa</span><b className={filteredConnections.some((item) => item.status === 'verified') ? 'text-emerald-700' : 'text-amber-700'}>{filteredConnections.some((item) => item.status === 'verified') ? 'Buffer verificado' : 'Aguardando API key desta marca'}</b></div>
+              <div className="flex justify-between gap-4"><span>Worker automático</span><b className={workerStatus?.publisher_cron && workerStatus?.cron_secret ? 'text-emerald-700' : 'text-amber-700'}>{workerStatus?.publisher_cron && workerStatus?.cron_secret ? 'Supabase pg_cron · 5 min' : 'Worker indisponível'}</b></div>
+              <div className="flex justify-between gap-4"><span>Sincronização de métricas</span><b className={workerStatus?.metrics_cron && workerStatus?.cron_secret ? 'text-emerald-700' : 'text-amber-700'}>{workerStatus?.metrics_cron && workerStatus?.cron_secret ? 'Supabase pg_cron · diária' : 'Cron de métricas indisponível'}</b></div>
+              {workerStatus && Number(workerStatus.connections_needing_key || 0) > 0 && (
                 <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                  Faltando:
-                  {!workerStatus.checks.cron_secret ? ' CRON_SECRET' : ''}
-                  {!workerStatus.checks.supabase_service_role ? ' SUPABASE_SERVICE_ROLE_KEY' : ''}
-                  {!workerStatus.checks.buffer_api_key ? ' BUFFER_API_KEY' : ''}
+                  {workerStatus.connections_needing_key} conexão(ões) Buffer ainda precisam de API key.
                 </div>
               )}
               <div className="flex justify-between"><span>Métricas do provider</span><b className={filteredMetricSyncs.some((item) => item.status === 'observed') ? 'text-emerald-700' : 'text-amber-700'}>{filteredMetricSyncs.some((item) => item.status === 'observed') ? 'Dados observados' : 'Aguardando publicação + provider'}</b></div>

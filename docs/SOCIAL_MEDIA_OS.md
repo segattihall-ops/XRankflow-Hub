@@ -59,9 +59,9 @@ Knowledge and automation:
 8. Connect a publishing provider before enabling actual external publication.
 9. Reconcile provider responses and save external IDs before marking a post published.
 
-## Known external blocker
+## External connection status
 
-At implementation time, the Buffer app is present but no eligible linked Buffer account is available to the connector. Therefore live publication is deliberately not claimed or enabled.
+Buffer OAuth connections are available in ChatGPT and were used to verify the real channel IDs for MasseurMatch and Voxmation. The production Social Media OS worker does not reuse ChatGPT OAuth tokens. Each Buffer account must therefore receive its own personal Buffer API key through the **Conexões Buffer** panel. Keys are written directly to Supabase Vault and are never returned to the browser after saving.
 
 
 ## Template Engine
@@ -107,32 +107,59 @@ When a Canva source exposes an Autofill dataset, change its template capability 
 
 ## Publishing Provider Layer
 
-The Social Media OS now has a provider-agnostic publishing queue.
+The production publisher runs in **Supabase**, not in the browser and not in Vercel Cron.
 
-### Buffer adapter
+### Runtime architecture
 
-Server-only endpoints:
-- `GET /api/social/providers/buffer/status` — checks whether Buffer is configured and discovers organizations/channels.
-- `POST /api/social/providers/buffer/map` — maps one discovered Buffer channel to one selected brand.
-- `POST /api/social/publish/dispatch` — atomically claims a queue item and schedules it in Buffer.
-- `POST /api/social/publish/reconcile` — checks Buffer after dispatch and only marks the item published after Buffer reports `sent`.
+- `pg_cron` runs `public.sm_cron_tick('run')` every 5 minutes.
+- `pg_cron` runs `public.sm_cron_tick('metrics')` daily.
+- `pg_net` invokes the `sm-publisher` Supabase Edge Function.
+- The Edge Function authenticates cron calls with the encrypted `sm_cron_secret` stored in Supabase Vault.
+- The Edge Function uses Supabase's server-side service role internally; no service-role key is exposed to the application.
+- Buffer API keys are stored per provider connection in Supabase Vault.
+- One brand can have its own Buffer account/credential without sharing a key with another brand.
 
-Runtime secret:
-- `BUFFER_API_KEY` must be configured in Vercel Production/Preview as appropriate.
-- The key is server-side only and is never returned to the browser or stored in Social Media OS tables.
+### Current verified Buffer accounts
 
-Publishing safety:
-- Only approved or scheduled content can enter the queue.
-- Brand, campaign, account, platform and pause state are revalidated by the database RPC.
-- Queue entries use an idempotency key to avoid duplicate dispatch.
-- A Buffer `createPost` success is stored as `enviado_api`, not `publicado`.
-- Publication becomes `publicado` only after reconciliation observes Buffer status `sent`.
-- Failed attempts are recorded with exponential retry metadata.
-- Instagram, TikTok, Pinterest and YouTube are deliberately blocked by the text-only worker until media-specific dispatch is implemented.
+MasseurMatch:
+- Instagram channel mapped.
+- Facebook channel mapped.
+- Buffer organization ID stored.
+- API-key credential slot created in Vault-backed connection settings.
 
-### Current external blocker
+Voxmation:
+- Instagram channel mapped.
+- Facebook channel mapped.
+- LinkedIn channel mapped.
+- Buffer organization ID stored.
+- API-key credential slot created in Vault-backed connection settings.
 
-If `BUFFER_API_KEY` is absent from the Vercel environment, the dashboard displays the blocker and dispatch buttons remain disabled. No post is consumed from the queue in that state.
+The ChatGPT Buffer OAuth connection is intentionally not copied into the application. The production worker requires the account owner's personal Buffer API key once per Buffer account.
+
+### Publishing safety
+
+- Only approved/scheduled content is eligible for the queue.
+- Brand, campaign, account, pause state, version, provider connection, and platform are validated.
+- The approved queue snapshot is immutable.
+- Queue items use idempotency keys.
+- `createPost` success becomes `enviado_api`, never `publicado`.
+- `publicado` requires a later provider confirmation that Buffer reports `sent`.
+- Network/5xx ambiguity moves the item to `incerto` and reconciles before any resend.
+- Rate-limit/auth failures pause only the affected provider connection within that worker run.
+- Exhausted attempts create an operational alert.
+- Cancellation requires remote confirmation.
+- Multi-account credentials are isolated by brand/provider connection.
+
+### Credential workflow
+
+1. Select a brand.
+2. Open **Conexões Buffer desta marca**.
+3. Click **Adicionar API key**.
+4. Paste the Buffer API key from Buffer Settings → API.
+5. The browser sends it directly to the `sm_upsert_buffer_connection` RPC over TLS.
+6. The RPC stores it encrypted in Supabase Vault.
+7. `sm-publisher` verifies the key against Buffer, confirms the organization, and synchronizes channels.
+8. The UI never reads the stored key back.
 
 
 ## Media dispatch
@@ -174,9 +201,10 @@ Storage:
 - Writes are performed by the server-side metrics worker.
 
 Automation:
-- `/api/cron/social-metrics` runs daily at `14:15 UTC`.
-- The worker considers published posts from the last 90 days and prioritizes the least recently synchronized items.
-- Up to 30 posts are refreshed per run.
+- Supabase `pg_cron` calls `sm_cron_tick('metrics')` daily.
+- The Supabase Edge Function reads each published post using that post's own provider connection/credential.
+- Published posts from the last 90 days are eligible for refresh.
+- Metrics are stored as provider observations with explicit `observed`, `pending`, `no_data`, and `error` states.
 - Buffer metrics can be delayed by roughly 24 hours, so the UI shows provider freshness separately from local sync time.
 
 The dashboard aggregates only the latest observed snapshot per content/metric type and labels the result as an observed summary, not a causal performance conclusion.

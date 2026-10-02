@@ -2,15 +2,5 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/social-publishing",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/social-metrics",
-      "schedule": "15 14 * * *"
-    }
-  ]
+  "framework": "nextjs"
 }
