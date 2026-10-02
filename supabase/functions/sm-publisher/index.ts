@@ -336,7 +336,7 @@ function realApi(key: string, organizationId: string | null): Api {
       if (
         row.platform === "instagram" &&
         row.format === "video_curto" &&
-        !assets.some((a) => a.video)
+        !assets.some((asset) => "video" in asset)
       ) {
         throw new BufferError("mutation", "Reel do Instagram exige vídeo");
       }
