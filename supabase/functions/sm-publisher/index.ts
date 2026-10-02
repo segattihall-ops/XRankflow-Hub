@@ -302,7 +302,7 @@ function buildAssets(row: Row) {
   const assets: BufferAssetInput[] = [];
   for (const item of row.creative_assets ?? []) {
     if (!item?.url || !/^https:\/\//i.test(item.url)) continue;
-    if (itemetric.type === "video") {
+    if (item.type === "video") {
       assets.push({
         video: {
           url: item.url,
@@ -311,7 +311,7 @@ function buildAssets(row: Row) {
             : {}),
         },
       });
-    } else if (itemetric.type === "image") {
+    } else if (item.type === "image") {
       assets.push({ image: { url: item.url } });
     }
   }
