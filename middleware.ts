@@ -2,6 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // Public cleaning-company quote links do not require an XRANKFLOW login.
+  if (request.nextUrl.pathname.startsWith('/turnover-quote/')) {
+    return NextResponse.next()
+  }
+
   // Vercel Cron requests are machine-to-machine and do not carry a user session.
   // The cron route performs its own Bearer CRON_SECRET verification.
   if (request.nextUrl.pathname.startsWith('/api/cron/')) {
