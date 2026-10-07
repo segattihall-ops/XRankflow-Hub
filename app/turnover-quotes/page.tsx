@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Camera, CheckCircle2, ClipboardCopy, DollarSign, ExternalLink, Home,
-  Loader2, Plus, RefreshCw, Sparkles, Users, XCircle
+  Camera, ClipboardCopy, ExternalLink, Loader2, Plus, RefreshCw, Sparkles
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
