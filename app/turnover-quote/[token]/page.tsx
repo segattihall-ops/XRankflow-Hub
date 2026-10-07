@@ -1,9 +1,9 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Check, CheckCircle2, Home, Loader2, ShieldCheck } from 'lucide-react'
 import { useParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createBrowserClient } from '@supabase/ssr'
 
 type PublicRequest = {
   id: string
@@ -22,7 +22,24 @@ const label = 'mb-1.5 block text-xs font-black uppercase tracking-wide text-slat
 
 export default function PublicTurnoverQuotePage() {
   const params = useParams<{ token: string }>()
-  const token = params?.token
+  const token = params?.token || ''
+
+  const publicSupabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://njwqeulzythluenexdcw.supabase.co'
+    const key =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      'sb_publishable_XbmJA9m7lSEywUBMbsQdSw_gsna1jqq'
+
+    return createBrowserClient(url, key, {
+      global: {
+        headers: {
+          'x-turnover-token': token,
+        },
+      },
+    })
+  }, [token])
+
   const [request, setRequest] = useState<PublicRequest | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -36,19 +53,32 @@ export default function PublicTurnoverQuotePage() {
 
   useEffect(() => {
     const load = async () => {
-      if (!token) return
-      const { data, error } = await supabase.rpc('cleaning_turnover_public_request', { p_token: token })
+      if (!token) {
+        setError('This quote request is unavailable.')
+        setLoading(false)
+        return
+      }
+
+      const { data, error } = await publicSupabase
+        .from('cleaning_turnover_requests')
+        .select('id, property_name, property_address, bedrooms, bathrooms, turnover_date, turnover_notes, photo_urls, status')
+        .eq('public_token', token)
+        .eq('status', 'open')
+        .maybeSingle()
+
       if (error || !data) setError('This quote request is unavailable or bidding has closed.')
       else setRequest(data as PublicRequest)
       setLoading(false)
     }
+
     void load()
-  }, [token])
+  }, [publicSupabase, token])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
 
+    if (!request) return
     if (!checks.materials || !checks.laundry || !checks.paper || !checks.toilet) {
       setError('The total price must include all required items before you can submit.')
       return
@@ -59,27 +89,28 @@ export default function PublicTurnoverQuotePage() {
     }
 
     setSending(true)
-    const { error } = await supabase.rpc('submit_cleaning_turnover_quote', {
-      p_token: token,
-      p_company_name: form.company_name.trim(),
-      p_contact_name: form.contact_name.trim() || null,
-      p_email: form.email.trim() || null,
-      p_phone: form.phone.trim() || null,
-      p_total_price: Number(form.total_price),
-      p_includes_cleaning_supplies: checks.materials,
-      p_includes_laundry: checks.laundry,
-      p_includes_paper_towels: checks.paper,
-      p_includes_toilet_paper: checks.toilet,
-      p_estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
-      p_team_size: form.team_size ? Number(form.team_size) : null,
-      p_availability_notes: form.availability_notes.trim() || null,
-      p_notes: form.notes.trim() || null,
-    })
+    const { error } = await publicSupabase
+      .from('cleaning_turnover_quotes')
+      .insert({
+        request_id: request.id,
+        company_name: form.company_name.trim(),
+        contact_name: form.contact_name.trim() || null,
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        total_price: Number(form.total_price),
+        currency: 'USD',
+        includes_cleaning_supplies: checks.materials,
+        includes_laundry: checks.laundry,
+        includes_paper_towels: checks.paper,
+        includes_toilet_paper: checks.toilet,
+        estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
+        team_size: form.team_size ? Number(form.team_size) : null,
+        availability_notes: form.availability_notes.trim() || null,
+        notes: form.notes.trim() || null,
+      })
 
     if (error) {
-      if (error.message.includes('all_required_inclusions')) setError('All required items must be included in the total price.')
-      else if (error.message.includes('contact_required')) setError('Please provide an email or phone number.')
-      else setError('We could not submit the quote. Please review the form and try again.')
+      setError('We could not submit the quote. Please review the total price, contact information, and included items.')
       setSending(false)
       return
     }
@@ -158,11 +189,11 @@ export default function PublicTurnoverQuotePage() {
             {error && <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
 
             <div className="space-y-4">
-              <div><label className={label}>Company name *</label><input className={field} required value={form.company_name} onChange={e => setForm(f => ({...f, company_name:e.target.value}))}/></div>
-              <div><label className={label}>Contact name</label><input className={field} value={form.contact_name} onChange={e => setForm(f => ({...f, contact_name:e.target.value}))}/></div>
+              <div><label className={label}>Company name *</label><input className={field} required maxLength={160} value={form.company_name} onChange={e => setForm(f => ({...f, company_name:e.target.value}))}/></div>
+              <div><label className={label}>Contact name</label><input className={field} maxLength={160} value={form.contact_name} onChange={e => setForm(f => ({...f, contact_name:e.target.value}))}/></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Email</label><input className={field} type="email" value={form.email} onChange={e => setForm(f => ({...f, email:e.target.value}))}/></div>
-                <div><label className={label}>Phone</label><input className={field} value={form.phone} onChange={e => setForm(f => ({...f, phone:e.target.value}))}/></div>
+                <div><label className={label}>Email</label><input className={field} type="email" maxLength={240} value={form.email} onChange={e => setForm(f => ({...f, email:e.target.value}))}/></div>
+                <div><label className={label}>Phone</label><input className={field} maxLength={80} value={form.phone} onChange={e => setForm(f => ({...f, phone:e.target.value}))}/></div>
               </div>
 
               <div className="rounded-2xl bg-slate-950 p-4 text-white">
@@ -181,11 +212,11 @@ export default function PublicTurnoverQuotePage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Estimated hours</label><input className={field} min="0.5" step="0.5" type="number" value={form.estimated_hours} onChange={e => setForm(f => ({...f, estimated_hours:e.target.value}))}/></div>
+                <div><label className={label}>Estimated hours</label><input className={field} min="0.5" max="168" step="0.5" type="number" value={form.estimated_hours} onChange={e => setForm(f => ({...f, estimated_hours:e.target.value}))}/></div>
                 <div><label className={label}>Team size</label><input className={field} min="1" max="50" type="number" value={form.team_size} onChange={e => setForm(f => ({...f, team_size:e.target.value}))}/></div>
               </div>
-              <div><label className={label}>Availability</label><textarea className={field} rows={2} value={form.availability_notes} onChange={e => setForm(f => ({...f, availability_notes:e.target.value}))} placeholder="Days/times you can handle turnovers"/></div>
-              <div><label className={label}>Notes</label><textarea className={field} rows={3} value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Anything else we should know"/></div>
+              <div><label className={label}>Availability</label><textarea className={field} maxLength={1200} rows={2} value={form.availability_notes} onChange={e => setForm(f => ({...f, availability_notes:e.target.value}))} placeholder="Days/times you can handle turnovers"/></div>
+              <div><label className={label}>Notes</label><textarea className={field} maxLength={3000} rows={3} value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder="Anything else we should know"/></div>
 
               <button disabled={sending || !allIncluded} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">
                 {sending ? <Loader2 size={17} className="animate-spin"/> : <CheckCircle2 size={17}/>}
