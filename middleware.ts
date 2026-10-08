@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   // Public cleaning-company quote links do not require an XRANKFLOW login.
-  if (request.nextUrl.pathname.startsWith('/turnover-quote/')) {
+  if (/^\/turnover-quote(\/|$)/.test(request.nextUrl.pathname)) {
     return NextResponse.next()
   }
 
