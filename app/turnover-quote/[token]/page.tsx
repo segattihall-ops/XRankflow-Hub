@@ -21,6 +21,7 @@ type PublicRequest = {
   turnover_date: string | null
   turnover_notes: string | null
   photo_urls: string[]
+  extra_inclusions: string[]
   status: string
 }
 
@@ -68,6 +69,24 @@ const copy = {
     laundry: 'Laundry',
     paperTowels: 'Paper towels',
     toiletPaper: 'Toilet paper',
+    screeningTitle: "Quick service questions",
+    noticeQuestion: "How much advance notice do you need to schedule a cleaning?",
+    sameDayQuestion: "Can you handle a same-day checkout and check-in?",
+    equipmentQuestion: "What cleaning equipment do you bring?",
+    laundryQuestion: "Where do you wash sheets and towels?",
+    laundryProcessQuestion: "How do you wash and dry used sheets and towels after checkout, then prepare fresh linens before check-in?",
+    laundryPolicy: "AFTER checkout: wash and fully dry all used sheets and towels. BEFORE next check-in: make beds with clean sheets and provide fresh towels. No unwashed reuse; washing/drying are included in your quote.",
+    experienceQuestion: "Years of Airbnb cleaning experience (optional)",
+    insuranceQuestion: "Do you carry business liability insurance?",
+    completionPhotosQuestion: "I agree to provide completion photos.",
+    selectAnswer: "Select an answer",
+    yesAnswer: "Yes",
+    noAnswer: "No",
+    laundryPlaces: ["At the Airbnb","Off-site / laundromat","Both"],
+    missingAnswers: "Complete the scheduling, equipment, laundry and completion photo questions.",
+    extraInclusionsTitle: "Additional required items (included in the price)",
+    equipmentHint: "Vacuum, mop, tools, etc.",
+    laundryHint: "Explain collection, wash/dry, and preparation for the next guests",
     processTitle: 'How the selection works',
     process: [
       ['Review', 'Review the property, photos and turnover expectations.'],
@@ -144,6 +163,24 @@ const copy = {
     laundry: 'Lavanderia',
     paperTowels: 'Papel-toalha',
     toiletPaper: 'Papel higiênico',
+    screeningTitle: "Perguntas rápidas sobre o serviço",
+    noticeQuestion: "Com quanta antecedência precisa agendar uma limpeza?",
+    sameDayQuestion: "Consegue fazer turnover no mesmo dia entre checkout e check-in?",
+    equipmentQuestion: "Quais equipamentos de limpeza você leva?",
+    laundryQuestion: "Onde lava lençóis e toalhas?",
+    laundryProcessQuestion: "Como lava e seca os lençóis e toalhas usados após checkout e prepara peças limpas antes do check-in?",
+    laundryPolicy: "APÓS checkout: lavar e secar todos os lençóis e toalhas usados. ANTES do próximo check-in: arrumar camas com lençóis limpos e colocar toalhas limpas. Nunca reutilizar sem lavar; lavagem/secagem estão no preço.",
+    experienceQuestion: "Anos de experiência com Airbnb (opcional)",
+    insuranceQuestion: "Possui seguro de responsabilidade civil?",
+    completionPhotosQuestion: "Concordo em enviar fotos finais de conclusão.",
+    selectAnswer: "Selecione uma opção",
+    yesAnswer: "Sim",
+    noAnswer: "Não",
+    laundryPlaces: ["No Airbnb","Fora / lavanderia","Ambos"],
+    missingAnswers: "Responda às perguntas sobre agendamento, equipamentos, lavanderia e fotos finais.",
+    extraInclusionsTitle: "Itens adicionais obrigatórios (incluídos no preço)",
+    equipmentHint: "Aspirador, mop, ferramentas, etc.",
+    laundryHint: "Explique coleta, lavagem/secagem e preparação para os próximos hóspedes",
     processTitle: 'Como funciona a seleção',
     process: [
       ['Revisão', 'Revise o imóvel, as fotos e as expectativas do turnover.'],
@@ -220,6 +257,24 @@ const copy = {
     laundry: 'Lavandería',
     paperTowels: 'Toallas de papel',
     toiletPaper: 'Papel higiénico',
+    screeningTitle: "Preguntas rápidas sobre el servicio",
+    noticeQuestion: "¿Con cuánta anticipación necesita programar una limpieza?",
+    sameDayQuestion: "¿Puede hacer un turnover el mismo día entre checkout y check-in?",
+    equipmentQuestion: "¿Qué equipo de limpieza trae?",
+    laundryQuestion: "¿Dónde lava sábanas y toallas?",
+    laundryProcessQuestion: "¿Cómo lava y seca la ropa usada después del checkout y prepara ropa limpia antes del check-in?",
+    laundryPolicy: "DESPUÉS del checkout: lavar y secar completamente sábanas y toallas usadas. ANTES del próximo check-in: preparar camas con sábanas limpias y dejar toallas frescas. No reutilizar sin lavar; lavado/secado incluidos en el precio.",
+    experienceQuestion: "Años de experiencia con Airbnb (opcional)",
+    insuranceQuestion: "¿Tiene seguro de responsabilidad civil?",
+    completionPhotosQuestion: "Acepto enviar fotos finales del trabajo.",
+    selectAnswer: "Seleccione una opción",
+    yesAnswer: "Sí",
+    noAnswer: "No",
+    laundryPlaces: ["En el Airbnb","Fuera / lavandería","Ambos"],
+    missingAnswers: "Complete las preguntas de agenda, equipo, lavandería y fotos finales.",
+    extraInclusionsTitle: "Elementos adicionales obligatorios (incluidos en el precio)",
+    equipmentHint: "Aspiradora, trapeador, herramientas, etc.",
+    laundryHint: "Explique cómo recoge, lava/seca y prepara ropa limpia para nuevos huéspedes",
     processTitle: 'Cómo funciona la selección',
     process: [
       ['Revisión', 'Revise la propiedad, las fotos y las expectativas del turnover.'],
@@ -290,8 +345,16 @@ export default function PublicTurnoverQuotePage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
-  const [errorKey, setErrorKey] = useState<'unavailable' | 'unavailableClosed' | 'errorAll' | 'errorContact' | 'errorSubmit' | null>(null)
+  const [errorKey, setErrorKey] = useState<'unavailable' | 'unavailableClosed' | 'errorAll' | 'errorContact' | 'errorSubmit' | 'missingAnswers' | null>(null)
   const [allCostsConfirmed, setAllCostsConfirmed] = useState(false)
+  const [noticeHours, setNoticeHours] = useState('')
+  const [sameDay, setSameDay] = useState('')
+  const [equipment, setEquipment] = useState('')
+  const [laundryMethod, setLaundryMethod] = useState('')
+  const [laundryProcess, setLaundryProcess] = useState('')
+  const [experience, setExperience] = useState('')
+  const [insured, setInsured] = useState('')
+  const [completionPhotos, setCompletionPhotos] = useState(false)
   const [form, setForm] = useState({
     company_name: '', contact_name: '', email: '', phone: '', total_price: '',
     estimated_hours: '', team_size: '', availability_notes: '', notes: ''
@@ -313,7 +376,7 @@ export default function PublicTurnoverQuotePage() {
 
       const { data, error } = await publicSupabase
         .from('cleaning_turnover_requests')
-        .select('id, property_name, property_address, airbnb_url, bedrooms, bathrooms, turnover_date, turnover_notes, photo_urls, status')
+        .select('id, property_name, property_address, airbnb_url, bedrooms, bathrooms, turnover_date, turnover_notes, photo_urls, extra_inclusions, status')
         .eq('public_token', token)
         .eq('status', 'open')
         .maybeSingle()
@@ -372,9 +435,10 @@ export default function PublicTurnoverQuotePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const allIncluded = allCostsConfirmed && allCostsConfirmed && allCostsConfirmed && allCostsConfirmed
+  const allIncluded = allCostsConfirmed
+  const answersComplete = noticeHours !== '' && sameDay !== '' && equipment.trim().length >= 3 && laundryMethod !== '' && laundryProcess.trim().length >= 10 && completionPhotos
   const hasContact = Boolean(form.email.trim() || form.phone.trim())
-  const canSubmit = allIncluded && hasContact && Boolean(form.company_name.trim()) && Number(form.total_price) > 0
+  const canSubmit = allIncluded && answersComplete && hasContact && Boolean(form.company_name.trim()) && Number(form.total_price) > 0
 
   const languageSwitcher = (
     <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/10 p-1 backdrop-blur">
