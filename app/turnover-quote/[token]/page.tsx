@@ -85,7 +85,7 @@ const copy = {
     email: 'Email',
     phone: 'Phone',
     total: 'All-inclusive price per turnover',
-    confirm: 'Confirm your total includes',
+    confirm: 'I confirm my price includes everything listed',
     hours: 'Estimated hours',
     team: 'Team size',
     availability: 'Availability',
@@ -94,7 +94,7 @@ const copy = {
     notesPlaceholder: 'Experience, scheduling limitations, special services, or anything else we should know',
     submit: 'Submit quote',
     submitReady: 'Ready to submit',
-    confirmHelp: 'Confirm all four required inclusions to unlock submission.',
+    confirmHelp: 'Confirm the all-inclusive price to submit.',
     contactHelp: 'Provide at least an email or phone number.',
     privacy: 'Your quote is private. Other cleaning companies cannot see your submitted price.',
     errorAll: 'The total price must include all required items before you can submit.',
@@ -161,7 +161,7 @@ const copy = {
     email: 'Email',
     phone: 'Telefone',
     total: 'Preço completo por turnover',
-    confirm: 'Confirme que seu preço inclui',
+    confirm: 'Confirmo que meu preço inclui todos os itens',
     hours: 'Horas estimadas',
     team: 'Tamanho da equipe',
     availability: 'Disponibilidade',
@@ -170,7 +170,7 @@ const copy = {
     notesPlaceholder: 'Experiência, limitações de agenda, serviços especiais ou algo que devemos saber',
     submit: 'Enviar orçamento',
     submitReady: 'Pronto para enviar',
-    confirmHelp: 'Confirme os quatro itens obrigatórios para liberar o envio.',
+    confirmHelp: 'Confirme o preço completo para enviar.',
     contactHelp: 'Informe pelo menos um email ou telefone.',
     privacy: 'Seu orçamento é privado. Outras empresas de limpeza não conseguem ver o preço enviado.',
     errorAll: 'O preço total deve incluir todos os itens obrigatórios antes do envio.',
@@ -237,7 +237,7 @@ const copy = {
     email: 'Email',
     phone: 'Teléfono',
     total: 'Precio completo por turnover',
-    confirm: 'Confirme que su precio incluye',
+    confirm: 'Confirmo que mi precio incluye todos los artículos',
     hours: 'Horas estimadas',
     team: 'Tamaño del equipo',
     availability: 'Disponibilidad',
@@ -246,7 +246,7 @@ const copy = {
     notesPlaceholder: 'Experiencia, limitaciones de horario, servicios especiales o cualquier otra información',
     submit: 'Enviar cotización',
     submitReady: 'Listo para enviar',
-    confirmHelp: 'Confirme los cuatro elementos obligatorios para habilitar el envío.',
+    confirmHelp: 'Confirme el precio todo incluido para enviar.',
     contactHelp: 'Proporcione al menos un email o teléfono.',
     privacy: 'Su cotización es privada. Otras empresas de limpieza no pueden ver el precio enviado.',
     errorAll: 'El precio total debe incluir todos los artículos obligatorios antes de enviar.',
@@ -291,7 +291,7 @@ export default function PublicTurnoverQuotePage() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [errorKey, setErrorKey] = useState<'unavailable' | 'unavailableClosed' | 'errorAll' | 'errorContact' | 'errorSubmit' | null>(null)
-  const [checks, setChecks] = useState({ materials: false, laundry: false, paper: false, toilet: false })
+  const [allCostsConfirmed, setAllCostsConfirmed] = useState(false)
   const [form, setForm] = useState({
     company_name: '', contact_name: '', email: '', phone: '', total_price: '',
     estimated_hours: '', team_size: '', availability_notes: '', notes: ''
@@ -331,7 +331,7 @@ export default function PublicTurnoverQuotePage() {
     setErrorKey(null)
 
     if (!request) return
-    if (!checks.materials || !checks.laundry || !checks.paper || !checks.toilet) {
+    if (!allCostsConfirmed) {
       setErrorKey('errorAll')
       return
     }
@@ -351,10 +351,10 @@ export default function PublicTurnoverQuotePage() {
         phone: form.phone.trim() || null,
         total_price: Number(form.total_price),
         currency: 'USD',
-        includes_cleaning_supplies: checks.materials,
-        includes_laundry: checks.laundry,
-        includes_paper_towels: checks.paper,
-        includes_toilet_paper: checks.toilet,
+        includes_cleaning_supplies: allCostsConfirmed,
+        includes_laundry: allCostsConfirmed,
+        includes_paper_towels: allCostsConfirmed,
+        includes_toilet_paper: allCostsConfirmed,
         estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
         team_size: form.team_size ? Number(form.team_size) : null,
         availability_notes: form.availability_notes.trim() || null,
@@ -372,7 +372,7 @@ export default function PublicTurnoverQuotePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const allIncluded = checks.materials && checks.laundry && checks.paper && checks.toilet
+  const allIncluded = allCostsConfirmed && allCostsConfirmed && allCostsConfirmed && allCostsConfirmed
   const hasContact = Boolean(form.email.trim() || form.phone.trim())
   const canSubmit = allIncluded && hasContact && Boolean(form.company_name.trim()) && Number(form.total_price) > 0
 
@@ -612,12 +612,13 @@ export default function PublicTurnoverQuotePage() {
 
                   <div>
                     <p className={label}>{t.confirm} *</p>
-                    <div className="space-y-2.5">
-                      <CheckBox checked={checks.materials} onChange={v => setChecks(c => ({...c, materials:v}))} label={t.materials}/>
-                      <CheckBox checked={checks.laundry} onChange={v => setChecks(c => ({...c, laundry:v}))} label={t.laundry}/>
-                      <CheckBox checked={checks.paper} onChange={v => setChecks(c => ({...c, paper:v}))} label={t.paperTowels}/>
-                      <CheckBox checked={checks.toilet} onChange={v => setChecks(c => ({...c, toilet:v}))} label={t.toiletPaper}/>
-                    </div>
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 text-sm font-semibold transition ${allCostsConfirmed ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                      <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-emerald-600" checked={allCostsConfirmed} onChange={e => setAllCostsConfirmed(e.target.checked)}/>
+                      <span className="space-y-2">
+                        <span className="block font-black">{t.confirm}</span>
+                        <span className="block leading-6 text-slate-600">{[t.materials,t.laundry,t.paperTowels,t.toiletPaper].join(' · ')}</span>
+                      </span>
+                    </label>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
