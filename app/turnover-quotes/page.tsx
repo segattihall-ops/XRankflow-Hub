@@ -11,6 +11,7 @@ type TurnoverRequest = {
   public_token: string
   property_name: string
   property_address: string | null
+  airbnb_url: string | null
   bedrooms: number | null
   bathrooms: number | null
   turnover_date: string | null
@@ -49,6 +50,7 @@ export default function TurnoverQuotesPage() {
   const [form, setForm] = useState({
     property_name: '',
     property_address: '',
+    airbnb_url: '',
     bedrooms: '3',
     bathrooms: '2',
     turnover_date: '',
@@ -101,6 +103,7 @@ export default function TurnoverQuotesPage() {
       .insert({
         property_name: form.property_name.trim(),
         property_address: form.property_address.trim() || null,
+        airbnb_url: form.airbnb_url.trim() || null,
         bedrooms: form.bedrooms ? Number(form.bedrooms) : null,
         bathrooms: form.bathrooms ? Number(form.bathrooms) : null,
         turnover_date: form.turnover_date || null,
@@ -144,7 +147,7 @@ export default function TurnoverQuotesPage() {
 
     setRequests(current => [finalRequest, ...current])
     setSelectedId(finalRequest.id)
-    setForm({ property_name: '', property_address: '', bedrooms: '3', bathrooms: '2', turnover_date: '', turnover_notes: '' })
+    setForm({ property_name: '', property_address: '', airbnb_url: '', bedrooms: '3', bathrooms: '2', turnover_date: '', turnover_notes: '' })
     setPhotos([])
     setMessage('Turnover request created. Copy the public link and send it to cleaning companies.')
     setSaving(false)
@@ -187,6 +190,7 @@ export default function TurnoverQuotesPage() {
           <div className="space-y-4">
             <div><label className={label}>Property name</label><input className={input} value={form.property_name} onChange={e => setForm(f => ({...f, property_name:e.target.value}))} placeholder="Dallas Airbnb - Oak Lawn"/></div>
             <div><label className={label}>Property address</label><input className={input} value={form.property_address} onChange={e => setForm(f => ({...f, property_address:e.target.value}))} placeholder="Address shown to invited cleaners"/></div>
+            <div><label className={label}>Airbnb listing URL</label><input className={input} type="url" value={form.airbnb_url} onChange={e => setForm(f => ({...f, airbnb_url:e.target.value}))} placeholder="https://www.airbnb.com/rooms/..."/></div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={label}>Bedrooms</label><input className={input} type="number" min="0" step="0.5" value={form.bedrooms} onChange={e => setForm(f => ({...f, bedrooms:e.target.value}))}/></div>
               <div><label className={label}>Bathrooms</label><input className={input} type="number" min="0" step="0.5" value={form.bathrooms} onChange={e => setForm(f => ({...f, bathrooms:e.target.value}))}/></div>
@@ -261,7 +265,8 @@ export default function TurnoverQuotesPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => void copyLink(selected)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white"><ClipboardCopy size={16}/> Copy public link</button>
-                    <a href={publicUrl(selected)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold"><ExternalLink size={16}/> Open</a>
+                    <a href={publicUrl(selected)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold"><ExternalLink size={16}/> Open quote page</a>
+                    {selected.airbnb_url && <a href={selected.airbnb_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold"><ExternalLink size={16}/> Open Airbnb listing</a>}
                   </div>
                 </div>
 
