@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight, Bath, BedDouble, Camera, Check, CheckCircle2, ClipboardCheck,
   DollarSign, ExternalLink, Home, Languages, Loader2, MessageSquare,
-  ShieldCheck, Sparkles, Trash2, Users, WashingMachine
+  RefreshCw, ShieldCheck, Sparkles, Trash2
 } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -548,7 +548,7 @@ export default function PublicTurnoverQuotePage() {
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65 sm:text-base">{t.pricingBody}</p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <Inclusion icon={<Sparkles size={17}/>} text={t.materials}/>
-                <Inclusion icon={<WashingMachine size={17}/>} text={t.laundry}/>
+                <Inclusion icon={<RefreshCw size={17}/>} text={t.laundry}/>
                 <Inclusion icon={<ClipboardCheck size={17}/>} text={t.paperTowels}/>
                 <Inclusion icon={<CheckCircle2 size={17}/>} text={t.toiletPaper}/>
               </div>
