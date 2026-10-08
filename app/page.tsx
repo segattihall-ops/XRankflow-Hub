@@ -171,7 +171,6 @@ export default function Home() {
       runCount,
       successCount,
       failureCount,
-      successRate: runCount > 0 ? (successCount / runCount) * 100 : 0,
       minutesSaved,
       manualActionsRemoved,
       auto,
@@ -329,7 +328,7 @@ export default function Home() {
           <Metric label="Approval" value={automationSummary.approval} />
           <Metric label="Ativas verificadas" value={automationSummary.activeVerified} />
           <Metric label="Runs observados" value={automationSummary.runCount} />
-          <Metric label="Success rate" value={automationSummary.successRate} suffix="%" />
+          <Metric label="Sucessos verificados" value={automationSummary.successCount} />
           <Metric label="Falhas" value={automationSummary.failureCount} tone={automationSummary.failureCount ? 'danger' : 'normal'} />
           <Metric label="Min. economizados" value={automationSummary.minutesSaved} />
           <Metric label="Acoes removidas" value={automationSummary.manualActionsRemoved} />
