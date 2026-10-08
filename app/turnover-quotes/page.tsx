@@ -420,14 +420,67 @@ export default function TurnoverOperationsPage() {
   }
 
   const updateTurnoverStatus = async (turnover: Turnover, status: Turnover['status']) => {
+    if (status === 'assigned' && !turnover.vendor_id && !selected?.awarded_vendor_id) {
+      setMessage('Select a cleaner from the Quotes tab before assigning this turnover.')
+      return
+    }
+    if (status === 'completed' && (!turnover.final_photo_urls || turnover.final_photo_urls.length === 0)) {
+      setMessage('Upload at least one completion photo before approving and completing the turnover.')
+      return
+    }
+
     const payload: Partial<Turnover> = { status }
+    if (status === 'assigned' && !turnover.vendor_id && selected?.awarded_vendor_id) {
+      payload.vendor_id = selected.awarded_vendor_id
+      payload.source_quote_id = selected.awarded_quote_id
+      if (awardedQuote) payload.agreed_price = Number(awardedQuote.total_price)
+    }
     if (status === 'completed') payload.completed_at = new Date().toISOString()
+
     const { error } = await supabase.from('airbnb_turnovers').update(payload).eq('id', turnover.id)
     if (error) setMessage(error.message)
     else {
       setMessage(`Turnover marked ${status.replace(/_/g, ' ')}.`)
       await load()
     }
+  }
+
+  const uploadCompletionPhotos = async (turnover: Turnover, files: File[]) => {
+    if (files.length === 0) return
+    setSaving(true)
+    setMessage(null)
+
+    const uploaded: string[] = []
+    for (const file of files) {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
+      const path = `completion/${turnover.id}/${crypto.randomUUID()}-${safe}`
+      const result = await supabase.storage.from('cleaning-turnover-photos').upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+      if (result.error) {
+        setMessage(`A completion photo failed to upload: ${result.error.message}`)
+        continue
+      }
+      const { data } = supabase.storage.from('cleaning-turnover-photos').getPublicUrl(path)
+      if (data.publicUrl) uploaded.push(data.publicUrl)
+    }
+
+    if (uploaded.length > 0) {
+      const nextPhotos = [...(turnover.final_photo_urls || []), ...uploaded]
+      const updated = await supabase
+        .from('airbnb_turnovers')
+        .update({ final_photo_urls: nextPhotos })
+        .eq('id', turnover.id)
+
+      if (updated.error) setMessage(updated.error.message)
+      else {
+        setMessage(`${uploaded.length} completion photo(s) added.`)
+        await load()
+      }
+    }
+
+    setSaving(false)
   }
 
   const selectedMessageTurnover = turnovers.find(t => t.id === messageForm.turnover_id) || selectedTurnovers[0] || null
@@ -709,10 +762,28 @@ export default function TurnoverOperationsPage() {
                       <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black uppercase">{turnover.status.replace(/_/g, ' ')}</span>
                     </div>
                     {turnover.instructions && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{turnover.instructions}</p>}
+                    {turnover.final_photo_urls?.length > 0 && (
+                      <div className="mt-4">
+                        <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Completion evidence</p>
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+                          {turnover.final_photo_urls.map((url, index) => (
+                            <a key={url} href={url} target="_blank" rel="noreferrer">
+                              <img src={url} alt={`Completion photo ${index + 1}`} className="aspect-square w-full rounded-xl object-cover"/>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {turnover.status === 'planned' && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'assigned')}>Assign</StatusButton>}
-                      {['planned','assigned'].includes(turnover.status) && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'confirmed')}>Confirmed</StatusButton>}
+                      {turnover.status === 'planned' && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'assigned')}>Assign selected cleaner</StatusButton>}
+                      {turnover.status === 'assigned' && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'confirmed')}>Confirmed</StatusButton>}
                       {['assigned','confirmed'].includes(turnover.status) && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'in_progress')}>Start</StatusButton>}
+                      {['in_progress','awaiting_review','completed'].includes(turnover.status) && (
+                        <label className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold">
+                          {saving ? 'Uploading…' : 'Upload completion photos'}
+                          <input className="hidden" type="file" accept="image/*" multiple disabled={saving} onChange={e => void uploadCompletionPhotos(turnover, Array.from(e.target.files || []))}/>
+                        </label>
+                      )}
                       {turnover.status === 'in_progress' && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'awaiting_review')}>Ready for review</StatusButton>}
                       {turnover.status === 'awaiting_review' && <StatusButton primary onClick={() => void updateTurnoverStatus(turnover, 'completed')}>Approve & complete</StatusButton>}
                       {!['completed','canceled'].includes(turnover.status) && <StatusButton onClick={() => void updateTurnoverStatus(turnover, 'canceled')}>Cancel</StatusButton>}
