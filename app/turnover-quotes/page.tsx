@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Banknote, CalendarDays, Camera, ClipboardCopy, ExternalLink,
-  Loader2, Mail, MessageSquare, Plus, RefreshCw, Sparkles, Users, Wrench
+  Banknote, Bath, BedDouble, CalendarDays, Camera, ClipboardCopy, ExternalLink,
+  Home, Loader2, Mail, MessageSquare, Plus, RefreshCw, Sparkles, Users, Wrench
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -580,43 +580,83 @@ export default function TurnoverOperationsPage() {
   const openTurnovers = selectedTurnovers.filter(t => !['completed', 'canceled'].includes(t.status)).length
   const pendingPayments = selectedPayments.filter(p => ['pending', 'approved', 'hold'].includes(p.status))
   const pendingAmount = pendingPayments.reduce((sum, p) => sum + Number(p.amount), 0)
+  const upcomingReservations = selectedReservations
+    .filter(r => r.status === 'booked' && new Date(r.check_out_at).getTime() >= Date.now())
+    .sort((a, b) => +new Date(a.check_out_at) - +new Date(b.check_out_at))
+  const nextReservation = upcomingReservations[0] || null
+  const upcomingTurnovers = selectedTurnovers
+    .filter(t => !['completed', 'canceled'].includes(t.status) && new Date(t.scheduled_for).getTime() >= Date.now())
+    .sort((a, b) => +new Date(a.scheduled_for) - +new Date(b.scheduled_for))
+  const nextTurnover = upcomingTurnovers[0] || null
 
   return (
     <div className="mx-auto max-w-screen-2xl p-4 sm:p-6 lg:p-10">
-      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-black tracking-[0.18em] text-slate-500">PROPERTY OPERATIONS</p>
-          <h1 className="mt-1 text-3xl font-black text-slate-950 sm:text-4xl">Airbnb Turnover Operations Center</h1>
-          <p className="mt-2 max-w-3xl text-slate-500">
-            Collect cleaner quotes, select a vendor, track reservations, manage every turnover, log communications, and close payments.
-          </p>
+          <p className="text-[11px] font-black tracking-[0.18em] text-slate-400">XRANKFLOW · PROPERTY OPERATIONS</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Airbnb Turnover Command Center</h1>
         </div>
-        <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold">
+        <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold shadow-sm">
           <RefreshCw size={16}/> Refresh
         </button>
       </div>
 
-      {message && <div className="mb-5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{message}</div>}
+      {message && <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">{message}</div>}
+
+      {selected ? (
+        <section className="relative mb-5 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-2xl shadow-slate-900/10">
+          {selected.photo_urls?.[0] && (
+            <>
+              <img src={selected.photo_urls[0]} alt={selected.property_name} className="absolute inset-0 h-full w-full object-cover opacity-30"/>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-slate-950/50"/>
+            </>
+          )}
+          <div className="relative p-6 sm:p-8">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${selected.status === 'awarded' ? 'bg-emerald-400/15 text-emerald-200' : selected.status === 'open' ? 'bg-blue-400/15 text-blue-200' : 'bg-white/10 text-white/70'}`}>
+                    {selected.status}
+                  </span>
+                  {awardedVendor && <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/75">Cleaner · {awardedVendor.company_name}</span>}
+                </div>
+                <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-5xl">{selected.property_name}</h2>
+                {selected.property_address && <p className="mt-2 text-sm text-white/60 sm:text-base">{selected.property_address}</p>}
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-white/75">
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2"><BedDouble size={16}/>{selected.bedrooms ?? '—'} beds</span>
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2"><Bath size={16}/>{selected.bathrooms ?? '—'} baths</span>
+                  {nextReservation && <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2"><CalendarDays size={16}/>Next checkout {new Date(nextReservation.check_out_at).toLocaleDateString()}</span>}
+                  {nextTurnover && <span className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2"><Wrench size={16}/>Turnover {new Date(nextTurnover.scheduled_for).toLocaleDateString()}</span>}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => void copyLink(selected)} className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-black text-slate-950 shadow-lg"><ClipboardCopy size={16}/> Copy quote link</button>
+                <a href={publicUrl(selected)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-black text-white backdrop-blur"><ExternalLink size={16}/> Public portal</a>
+                {selected.airbnb_url && <a href={selected.airbnb_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-black text-white backdrop-blur"><ExternalLink size={16}/> Airbnb</a>}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="mb-5 rounded-[2rem] border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
+          <Home className="mx-auto text-slate-300" size={36}/>
+          <p className="mt-3 font-black text-slate-900">Select a property to open its operations center.</p>
+        </section>
+      )}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Quotes received" value={String(selectedQuotes.length)} icon={<Sparkles size={18}/>}/>
         <Metric label="Open turnovers" value={String(openTurnovers)} icon={<Wrench size={18}/>}/>
         <Metric label="Selected cleaner" value={awardedVendor?.company_name || 'Not selected'} icon={<Users size={18}/>}/>
-        <Metric label="Pending payments" value={`$${pendingAmount.toFixed(2)}`} icon={<Banknote size={18}/>}/>
+        <Metric label="Pending payments" value={`${pendingAmount.toFixed(2)}`} icon={<Banknote size={18}/>}/>
       </div>
 
-      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_auto]">
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Property</label>
         <select className={input} value={selectedId || ''} onChange={e => setSelectedId(e.target.value || null)}>
           <option value="">Select property</option>
           {requests.map(request => <option key={request.id} value={request.id}>{request.property_name}</option>)}
         </select>
-        {selected && (
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => void copyLink(selected)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white"><ClipboardCopy size={16}/> Copy quote link</button>
-            <a href={publicUrl(selected)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold"><ExternalLink size={16}/> Public quote page</a>
-            {selected.airbnb_url && <a href={selected.airbnb_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold"><ExternalLink size={16}/> Airbnb</a>}
-          </div>
-        )}
       </div>
 
       <div className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2">
