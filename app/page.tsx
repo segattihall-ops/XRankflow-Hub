@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
-  Bot,
   Building2,
   CheckCircle2,
   CheckSquare,
@@ -120,10 +119,6 @@ export default function Home() {
   const today = new Date().toISOString().slice(0, 10)
   const overdue = useMemo(
     () => tasks.filter(task => task.due_date && task.due_date < today && task.status !== 'Done'),
-    [tasks, today],
-  )
-  const dueToday = useMemo(
-    () => tasks.filter(task => task.due_date === today && task.status !== 'Done'),
     [tasks, today],
   )
   const highPriority = useMemo(
