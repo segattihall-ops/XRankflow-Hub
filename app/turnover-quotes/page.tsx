@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Banknote, CalendarDays, Camera, CheckCircle2, ClipboardCopy, ExternalLink,
+  Banknote, CalendarDays, Camera, ClipboardCopy, ExternalLink,
   Loader2, Mail, MessageSquare, Plus, RefreshCw, Sparkles, Users, Wrench
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -425,7 +425,7 @@ export default function TurnoverOperationsPage() {
     const { error } = await supabase.from('airbnb_turnovers').update(payload).eq('id', turnover.id)
     if (error) setMessage(error.message)
     else {
-      setMessage(`Turnover marked ${status.replaceAll('_', ' ')}.`)
+      setMessage(`Turnover marked ${status.replace(/_/g, ' ')}.`)
       await load()
     }
   }
@@ -706,7 +706,7 @@ export default function TurnoverOperationsPage() {
                         <h3 className="mt-1 text-lg font-black">{vendor?.company_name || 'Cleaner not assigned'}</h3>
                         <p className="mt-1 text-sm text-slate-500">{turnover.agreed_price ? `Agreed price: $${Number(turnover.agreed_price).toFixed(2)}` : 'No agreed price yet'}</p>
                       </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black uppercase">{turnover.status.replaceAll('_', ' ')}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black uppercase">{turnover.status.replace(/_/g, ' ')}</span>
                     </div>
                     {turnover.instructions && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{turnover.instructions}</p>}
                     <div className="mt-4 flex flex-wrap gap-2">
