@@ -36,6 +36,11 @@ type Quote = {
   total_price: number
   estimated_hours: number | null
   team_size: number | null
+  cleaner_type: 'business' | 'individual' | null
+  service_area: string | null
+  years_experience: number | null
+  has_insurance: boolean | null
+  same_day_available: boolean | null
   availability_notes: string | null
   notes: string | null
   submitted_at: string
@@ -694,7 +699,7 @@ export default function TurnoverOperationsPage() {
                 </label>
               </div>
               <div className="rounded-xl bg-slate-950 p-4 text-xs text-slate-200">
-                Every submitted price must already include cleaning supplies, laundry, paper towels, and toilet paper.
+                Every submitted price must already include cleaning supplies, laundry, paper towels, toilet paper, trash bags and removal, kitchen and bathroom consumables, and equipment/transport.
               </div>
               <button disabled={saving} onClick={() => void createRequest()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-50">
                 {saving ? <Loader2 size={17} className="animate-spin"/> : <Sparkles size={17}/>}Create quote request
@@ -735,6 +740,11 @@ export default function TurnoverOperationsPage() {
                       <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
                         {quote.estimated_hours && <span>{quote.estimated_hours} hours</span>}
                         {quote.team_size && <span>{quote.team_size} cleaner{quote.team_size === 1 ? '' : 's'}</span>}
+                        {quote.cleaner_type && <span>{quote.cleaner_type === 'business' ? 'Business' : 'Individual'}</span>}
+                        {quote.service_area && <span>{quote.service_area}</span>}
+                        {quote.years_experience != null && <span>{quote.years_experience} yr{quote.years_experience === 1 ? '' : 's'} experience</span>}
+                        {quote.has_insurance != null && <span>{quote.has_insurance ? 'Insured' : 'No liability insurance'}</span>}
+                        {quote.same_day_available != null && <span>{quote.same_day_available ? 'Same-day turnovers' : 'No same-day turnovers'}</span>}
                         <span>{new Date(quote.submitted_at).toLocaleString()}</span>
                       </div>
                       {quote.availability_notes && <p className="mt-3 text-sm"><b>Availability:</b> {quote.availability_notes}</p>}

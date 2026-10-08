@@ -2,9 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import {
-  ArrowRight, Bath, BedDouble, Camera, Check, CheckCircle2, ClipboardCheck,
-  DollarSign, ExternalLink, Home, Languages, Loader2, MessageSquare,
-  RefreshCw, ShieldCheck, Sparkles, Trash2
+  ArrowRight, Bath, BedDouble, Building2, Camera, ChefHat, Check, CheckCircle2,
+  ClipboardCheck, DollarSign, Droplets, ExternalLink, Home, Languages, Loader2,
+  MessageSquare, RefreshCw, ShieldCheck, Shirt, Sparkles, SprayCan, Trash2, Truck, User
 } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -22,6 +22,27 @@ type PublicRequest = {
   turnover_notes: string | null
   photo_urls: string[]
   status: string
+}
+
+type CleanerType = 'business' | 'individual'
+
+const requiredKeys = ['materials', 'laundry', 'paper', 'toilet', 'trash', 'kitchen', 'bathroom', 'equipment'] as const
+type RequiredKey = typeof requiredKeys[number]
+
+const emptyChecks: Record<RequiredKey, boolean> = {
+  materials: false, laundry: false, paper: false, toilet: false,
+  trash: false, kitchen: false, bathroom: false, equipment: false,
+}
+
+const requiredIcons: Record<RequiredKey, React.ReactNode> = {
+  materials: <SprayCan size={17}/>,
+  laundry: <Shirt size={17}/>,
+  paper: <ClipboardCheck size={17}/>,
+  toilet: <CheckCircle2 size={17}/>,
+  trash: <Trash2 size={17}/>,
+  kitchen: <ChefHat size={17}/>,
+  bathroom: <Droplets size={17}/>,
+  equipment: <Truck size={17}/>,
 }
 
 const field = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-4 focus:ring-slate-950/5'
@@ -51,11 +72,11 @@ const copy = {
       'Full cleaning of bedrooms, bathrooms and common areas',
       'Kitchen cleaning, counters, sink and appliance surfaces',
       'Floors vacuumed/mopped and visible dust removed',
-      'Trash collected and removed from the property',
+      'Trash removed and new trash bags placed',
       'Laundry completed and linens/towels reset for the next guest',
       'Beds reset and guest-ready presentation restored',
-      'Paper towels and toilet paper restocked',
-      'Cleaning supplies and materials included in your price',
+      'Paper towels, toilet paper, dish soap, sponges and hand soap restocked',
+      'Cleaning supplies, equipment and transport included in your price',
       'Report damage, missing items or unusual conditions',
       'Final completion photos when requested',
     ],
@@ -63,11 +84,17 @@ const copy = {
     standardBody: 'The property must be left clean, organized, stocked and ready for the next guest. If something prevents completion, report it immediately instead of marking the turnover complete.',
     pricingEyebrow: 'ALL-INCLUSIVE PRICING',
     pricingTitle: 'One total price. No surprise add-ons.',
-    pricingBody: 'Your submitted amount must already include the required operating costs below. Do not submit a base cleaning price and add these charges later.',
-    materials: 'Cleaning supplies & materials',
-    laundry: 'Laundry',
-    paperTowels: 'Paper towels',
-    toiletPaper: 'Toilet paper',
+    pricingBody: 'Your submitted amount must already include every required item below. Do not submit a base cleaning price and add these charges later.',
+    inclusions: {
+      materials: 'Cleaning supplies & materials',
+      laundry: 'Laundry (linens & towels)',
+      paper: 'Paper towels replaced',
+      toilet: 'Toilet paper replaced',
+      trash: 'New trash bags & trash removal',
+      kitchen: 'Dish soap, sponges & kitchen supplies',
+      bathroom: 'Hand soap & bathroom consumables',
+      equipment: 'Equipment, transport & travel',
+    },
     processTitle: 'How the selection works',
     process: [
       ['Review', 'Review the property, photos and turnover expectations.'],
@@ -80,21 +107,31 @@ const copy = {
     formEyebrow: 'CLEANING COMPANY QUOTE',
     formTitle: 'Submit your quote',
     formSub: 'Complete the form below. You can submit from your phone in a few minutes.',
-    company: 'Company / cleaner name',
+    profileTitle: 'Cleaner profile',
+    opsTitle: 'Operations',
+    cleanerType: 'Cleaner type',
+    cleanerTypes: { business: 'Business', individual: 'Individual / freelancer' },
+    company: 'Business or cleaner name',
     contact: 'Contact name',
     email: 'Email',
     phone: 'Phone',
+    serviceArea: 'Service area (city or neighborhood)',
+    experience: 'Years of experience',
+    team: 'Team size',
     total: 'All-inclusive price per turnover',
     confirm: 'Confirm your total includes',
-    hours: 'Estimated hours',
-    team: 'Team size',
+    hours: 'Estimated hours per turnover',
+    insurance: 'Carry liability insurance?',
+    sameDay: 'Available for same-day turnovers?',
+    yes: 'Yes',
+    no: 'No',
     availability: 'Availability',
     availabilityPlaceholder: 'Days/times you are generally available for turnovers',
     notes: 'Additional notes',
     notesPlaceholder: 'Experience, scheduling limitations, special services, or anything else we should know',
     submit: 'Submit quote',
     submitReady: 'Ready to submit',
-    confirmHelp: 'Confirm all four required inclusions to unlock submission.',
+    confirmHelp: 'Confirm every required inclusion to unlock submission.',
     contactHelp: 'Provide at least an email or phone number.',
     privacy: 'Your quote is private. Other cleaning companies cannot see your submitted price.',
     errorAll: 'The total price must include all required items before you can submit.',
@@ -127,11 +164,11 @@ const copy = {
       'Limpeza completa dos quartos, banheiros e áreas comuns',
       'Limpeza da cozinha, bancadas, pia e superfícies dos eletrodomésticos',
       'Aspirar/passar pano nos pisos e remover poeira visível',
-      'Recolher e retirar o lixo do imóvel',
+      'Retirar o lixo e colocar sacos de lixo novos',
       'Fazer laundry e preparar roupas de cama/toalhas para o próximo hóspede',
       'Arrumar as camas e restaurar a apresentação do imóvel',
-      'Repor papel-toalha e papel higiênico',
-      'Incluir produtos e materiais de limpeza no preço',
+      'Repor papel-toalha, papel higiênico, detergente, esponjas e sabonete de mão',
+      'Incluir produtos, equipamentos e transporte no preço',
       'Reportar danos, itens faltando ou situações fora do normal',
       'Enviar fotos finais quando solicitado',
     ],
@@ -139,11 +176,17 @@ const copy = {
     standardBody: 'O imóvel deve ficar limpo, organizado, abastecido e pronto para o próximo hóspede. Se algo impedir a conclusão, deve ser reportado imediatamente em vez de marcar o turnover como concluído.',
     pricingEyebrow: 'PREÇO COMPLETO',
     pricingTitle: 'Um preço total. Sem cobranças surpresa.',
-    pricingBody: 'O valor enviado deve incluir todos os custos operacionais obrigatórios abaixo. Não envie um preço básico para acrescentar cobranças depois.',
-    materials: 'Produtos e materiais de limpeza',
-    laundry: 'Lavanderia',
-    paperTowels: 'Papel-toalha',
-    toiletPaper: 'Papel higiênico',
+    pricingBody: 'O valor enviado deve incluir todos os itens obrigatórios abaixo. Não envie um preço básico para acrescentar cobranças depois.',
+    inclusions: {
+      materials: 'Produtos e materiais de limpeza',
+      laundry: 'Lavanderia (roupas de cama e toalhas)',
+      paper: 'Papel-toalha reposto',
+      toilet: 'Papel higiênico reposto',
+      trash: 'Sacos de lixo novos e retirada do lixo',
+      kitchen: 'Detergente, esponjas e suprimentos de cozinha',
+      bathroom: 'Sabonete de mão e consumíveis do banheiro',
+      equipment: 'Equipamentos, transporte e deslocamento',
+    },
     processTitle: 'Como funciona a seleção',
     process: [
       ['Revisão', 'Revise o imóvel, as fotos e as expectativas do turnover.'],
@@ -156,21 +199,31 @@ const copy = {
     formEyebrow: 'ORÇAMENTO DA EMPRESA DE LIMPEZA',
     formTitle: 'Enviar orçamento',
     formSub: 'Preencha o formulário abaixo. Você pode enviar pelo celular em poucos minutos.',
-    company: 'Empresa / cleaner',
+    profileTitle: 'Perfil do prestador',
+    opsTitle: 'Operação',
+    cleanerType: 'Tipo de prestador',
+    cleanerTypes: { business: 'Empresa', individual: 'Pessoa física / autônomo' },
+    company: 'Nome da empresa ou do profissional',
     contact: 'Nome do contato',
     email: 'Email',
     phone: 'Telefone',
+    serviceArea: 'Região de atendimento (cidade ou bairro)',
+    experience: 'Anos de experiência',
+    team: 'Tamanho da equipe',
     total: 'Preço completo por turnover',
     confirm: 'Confirme que seu preço inclui',
-    hours: 'Horas estimadas',
-    team: 'Tamanho da equipe',
+    hours: 'Horas estimadas por turnover',
+    insurance: 'Possui seguro de responsabilidade civil?',
+    sameDay: 'Atende turnovers no mesmo dia?',
+    yes: 'Sim',
+    no: 'Não',
     availability: 'Disponibilidade',
     availabilityPlaceholder: 'Dias/horários em que você normalmente pode realizar turnovers',
     notes: 'Observações adicionais',
     notesPlaceholder: 'Experiência, limitações de agenda, serviços especiais ou algo que devemos saber',
     submit: 'Enviar orçamento',
     submitReady: 'Pronto para enviar',
-    confirmHelp: 'Confirme os quatro itens obrigatórios para liberar o envio.',
+    confirmHelp: 'Confirme todos os itens obrigatórios para liberar o envio.',
     contactHelp: 'Informe pelo menos um email ou telefone.',
     privacy: 'Seu orçamento é privado. Outras empresas de limpeza não conseguem ver o preço enviado.',
     errorAll: 'O preço total deve incluir todos os itens obrigatórios antes do envio.',
@@ -203,11 +256,11 @@ const copy = {
       'Limpieza completa de habitaciones, baños y áreas comunes',
       'Limpieza de cocina, encimeras, fregadero y superficies de electrodomésticos',
       'Aspirar/fregar pisos y retirar polvo visible',
-      'Recoger y retirar la basura de la propiedad',
+      'Retirar la basura y colocar bolsas de basura nuevas',
       'Completar lavandería y preparar ropa de cama/toallas para el próximo huésped',
       'Preparar camas y restaurar la presentación de la propiedad',
-      'Reponer toallas de papel y papel higiénico',
-      'Incluir productos y materiales de limpieza en el precio',
+      'Reponer toallas de papel, papel higiénico, detergente, esponjas y jabón de manos',
+      'Incluir productos, equipos y transporte en el precio',
       'Reportar daños, artículos faltantes o condiciones inusuales',
       'Enviar fotos finales cuando se solicite',
     ],
@@ -215,11 +268,17 @@ const copy = {
     standardBody: 'La propiedad debe quedar limpia, organizada, abastecida y lista para el próximo huésped. Si algo impide completar el trabajo, debe reportarse inmediatamente.',
     pricingEyebrow: 'PRECIO TODO INCLUIDO',
     pricingTitle: 'Un precio total. Sin cargos sorpresa.',
-    pricingBody: 'El monto enviado debe incluir todos los costos obligatorios de abajo. No envíe un precio básico para agregar cargos después.',
-    materials: 'Productos y materiales de limpieza',
-    laundry: 'Lavandería',
-    paperTowels: 'Toallas de papel',
-    toiletPaper: 'Papel higiénico',
+    pricingBody: 'El monto enviado debe incluir todos los elementos obligatorios de abajo. No envíe un precio básico para agregar cargos después.',
+    inclusions: {
+      materials: 'Productos y materiales de limpieza',
+      laundry: 'Lavandería (ropa de cama y toallas)',
+      paper: 'Toallas de papel repuestas',
+      toilet: 'Papel higiénico repuesto',
+      trash: 'Bolsas de basura nuevas y retiro de basura',
+      kitchen: 'Detergente, esponjas y suministros de cocina',
+      bathroom: 'Jabón de manos y consumibles del baño',
+      equipment: 'Equipos, transporte y traslado',
+    },
     processTitle: 'Cómo funciona la selección',
     process: [
       ['Revisión', 'Revise la propiedad, las fotos y las expectativas del turnover.'],
@@ -232,21 +291,31 @@ const copy = {
     formEyebrow: 'COTIZACIÓN DE LA EMPRESA DE LIMPIEZA',
     formTitle: 'Enviar cotización',
     formSub: 'Complete el formulario. Puede enviarlo desde su teléfono en pocos minutos.',
-    company: 'Empresa / cleaner',
+    profileTitle: 'Perfil del prestador',
+    opsTitle: 'Operación',
+    cleanerType: 'Tipo de proveedor',
+    cleanerTypes: { business: 'Empresa', individual: 'Persona física / independiente' },
+    company: 'Nombre de la empresa o del profesional',
     contact: 'Nombre de contacto',
     email: 'Email',
     phone: 'Teléfono',
+    serviceArea: 'Zona de servicio (ciudad o barrio)',
+    experience: 'Años de experiencia',
+    team: 'Tamaño del equipo',
     total: 'Precio completo por turnover',
     confirm: 'Confirme que su precio incluye',
-    hours: 'Horas estimadas',
-    team: 'Tamaño del equipo',
+    hours: 'Horas estimadas por turnover',
+    insurance: '¿Tiene seguro de responsabilidad civil?',
+    sameDay: '¿Atiende turnovers el mismo día?',
+    yes: 'Sí',
+    no: 'No',
     availability: 'Disponibilidad',
     availabilityPlaceholder: 'Días/horarios en que normalmente puede realizar turnovers',
     notes: 'Notas adicionales',
     notesPlaceholder: 'Experiencia, limitaciones de horario, servicios especiales o cualquier otra información',
     submit: 'Enviar cotización',
     submitReady: 'Listo para enviar',
-    confirmHelp: 'Confirme los cuatro elementos obligatorios para habilitar el envío.',
+    confirmHelp: 'Confirme todos los elementos obligatorios para habilitar el envío.',
     contactHelp: 'Proporcione al menos un email o teléfono.',
     privacy: 'Su cotización es privada. Otras empresas de limpieza no pueden ver el precio enviado.',
     errorAll: 'El precio total debe incluir todos los artículos obligatorios antes de enviar.',
@@ -291,10 +360,14 @@ export default function PublicTurnoverQuotePage() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [errorKey, setErrorKey] = useState<'unavailable' | 'unavailableClosed' | 'errorAll' | 'errorContact' | 'errorSubmit' | null>(null)
-  const [checks, setChecks] = useState({ materials: false, laundry: false, paper: false, toilet: false })
+  const [cleanerType, setCleanerType] = useState<CleanerType>('business')
+  const [checks, setChecks] = useState<Record<RequiredKey, boolean>>(emptyChecks)
+  const [insurance, setInsurance] = useState<boolean | null>(null)
+  const [sameDay, setSameDay] = useState<boolean | null>(null)
   const [form, setForm] = useState({
-    company_name: '', contact_name: '', email: '', phone: '', total_price: '',
-    estimated_hours: '', team_size: '', availability_notes: '', notes: ''
+    company_name: '', contact_name: '', email: '', phone: '', service_area: '',
+    years_experience: '', total_price: '', estimated_hours: '', team_size: '',
+    availability_notes: '', notes: ''
   })
 
   useEffect(() => {
@@ -331,7 +404,7 @@ export default function PublicTurnoverQuotePage() {
     setErrorKey(null)
 
     if (!request) return
-    if (!checks.materials || !checks.laundry || !checks.paper || !checks.toilet) {
+    if (!allIncluded) {
       setErrorKey('errorAll')
       return
     }
@@ -355,6 +428,15 @@ export default function PublicTurnoverQuotePage() {
         includes_laundry: checks.laundry,
         includes_paper_towels: checks.paper,
         includes_toilet_paper: checks.toilet,
+        includes_trash_removal: checks.trash,
+        includes_kitchen_supplies: checks.kitchen,
+        includes_bathroom_supplies: checks.bathroom,
+        includes_equipment_transport: checks.equipment,
+        cleaner_type: cleanerType,
+        service_area: form.service_area.trim() || null,
+        years_experience: form.years_experience ? Number(form.years_experience) : null,
+        has_insurance: insurance,
+        same_day_available: sameDay,
         estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
         team_size: form.team_size ? Number(form.team_size) : null,
         availability_notes: form.availability_notes.trim() || null,
@@ -372,7 +454,7 @@ export default function PublicTurnoverQuotePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const allIncluded = checks.materials && checks.laundry && checks.paper && checks.toilet
+  const allIncluded = requiredKeys.every(key => checks[key])
   const hasContact = Boolean(form.email.trim() || form.phone.trim())
   const canSubmit = allIncluded && hasContact && Boolean(form.company_name.trim()) && Number(form.total_price) > 0
 
@@ -547,10 +629,9 @@ export default function PublicTurnoverQuotePage() {
               <h2 className="mt-2 text-3xl font-black tracking-tight">{t.pricingTitle}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65 sm:text-base">{t.pricingBody}</p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <Inclusion icon={<Sparkles size={17}/>} text={t.materials}/>
-                <Inclusion icon={<RefreshCw size={17}/>} text={t.laundry}/>
-                <Inclusion icon={<ClipboardCheck size={17}/>} text={t.paperTowels}/>
-                <Inclusion icon={<CheckCircle2 size={17}/>} text={t.toiletPaper}/>
+                {requiredKeys.map(key => (
+                  <Inclusion key={key} icon={requiredIcons[key]} text={t.inclusions[key]}/>
+                ))}
               </div>
             </section>
 
@@ -593,6 +674,17 @@ export default function PublicTurnoverQuotePage() {
                 {errorKey && <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700">{t[errorKey]}</div>}
 
                 <div className="space-y-5">
+                  <p className={label}>{t.profileTitle}</p>
+
+                  <div>
+                    <label className={label}>{t.cleanerType}</label>
+                    <Segment<CleanerType>
+                      options={[['business', t.cleanerTypes.business], ['individual', t.cleanerTypes.individual]]}
+                      value={cleanerType}
+                      onChange={setCleanerType}
+                    />
+                  </div>
+
                   <div><label className={label}>{t.company} *</label><input className={field} required maxLength={160} value={form.company_name} onChange={e => setForm(f => ({...f, company_name:e.target.value}))}/></div>
                   <div><label className={label}>{t.contact}</label><input className={field} maxLength={160} value={form.contact_name} onChange={e => setForm(f => ({...f, contact_name:e.target.value}))}/></div>
 
@@ -601,6 +693,13 @@ export default function PublicTurnoverQuotePage() {
                     <div><label className={label}>{t.phone}</label><input className={field} inputMode="tel" maxLength={80} value={form.phone} onChange={e => setForm(f => ({...f, phone:e.target.value}))}/></div>
                   </div>
                   {!hasContact && <p className="-mt-2 text-xs text-amber-600">{t.contactHelp}</p>}
+
+                  <div><label className={label}>{t.serviceArea}</label><input className={field} maxLength={160} value={form.service_area} onChange={e => setForm(f => ({...f, service_area:e.target.value}))}/></div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className={label}>{t.experience}</label><input className={field} min="0" max="80" type="number" inputMode="numeric" value={form.years_experience} onChange={e => setForm(f => ({...f, years_experience:e.target.value}))}/></div>
+                    <div><label className={label}>{t.team}</label><input className={field} min="1" max="50" type="number" inputMode="numeric" value={form.team_size} onChange={e => setForm(f => ({...f, team_size:e.target.value}))}/></div>
+                  </div>
 
                   <div className="rounded-3xl bg-slate-950 p-5 text-white">
                     <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.14em] text-white/50">{t.total} *</label>
@@ -613,16 +712,24 @@ export default function PublicTurnoverQuotePage() {
                   <div>
                     <p className={label}>{t.confirm} *</p>
                     <div className="space-y-2.5">
-                      <CheckBox checked={checks.materials} onChange={v => setChecks(c => ({...c, materials:v}))} label={t.materials}/>
-                      <CheckBox checked={checks.laundry} onChange={v => setChecks(c => ({...c, laundry:v}))} label={t.laundry}/>
-                      <CheckBox checked={checks.paper} onChange={v => setChecks(c => ({...c, paper:v}))} label={t.paperTowels}/>
-                      <CheckBox checked={checks.toilet} onChange={v => setChecks(c => ({...c, toilet:v}))} label={t.toiletPaper}/>
+                      {requiredKeys.map(key => (
+                        <CheckBox key={key} checked={checks[key]} onChange={v => setChecks(c => ({...c, [key]: v}))} label={t.inclusions[key]}/>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><label className={label}>{t.hours}</label><input className={field} min="0.5" max="168" step="0.5" type="number" inputMode="decimal" value={form.estimated_hours} onChange={e => setForm(f => ({...f, estimated_hours:e.target.value}))}/></div>
-                    <div><label className={label}>{t.team}</label><input className={field} min="1" max="50" type="number" inputMode="numeric" value={form.team_size} onChange={e => setForm(f => ({...f, team_size:e.target.value}))}/></div>
+                  <p className={label}>{t.opsTitle}</p>
+
+                  <div><label className={label}>{t.hours}</label><input className={field} min="0.5" max="168" step="0.5" type="number" inputMode="decimal" value={form.estimated_hours} onChange={e => setForm(f => ({...f, estimated_hours:e.target.value}))}/></div>
+
+                  <div>
+                    <label className={label}>{t.insurance}</label>
+                    <Segment<boolean> options={[[true, t.yes], [false, t.no]]} value={insurance} onChange={setInsurance}/>
+                  </div>
+
+                  <div>
+                    <label className={label}>{t.sameDay}</label>
+                    <Segment<boolean> options={[[true, t.yes], [false, t.no]]} value={sameDay} onChange={setSameDay}/>
                   </div>
 
                   <div><label className={label}>{t.availability}</label><textarea className={field} maxLength={1200} rows={3} value={form.availability_notes} onChange={e => setForm(f => ({...f, availability_notes:e.target.value}))} placeholder={t.availabilityPlaceholder}/></div>
@@ -677,7 +784,7 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
 function Inclusion({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-950">{icon}</div>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-950">{icon}</div>
       <span className="text-sm font-bold text-white/85">{text}</span>
     </div>
   )
@@ -699,5 +806,25 @@ function CheckBox({ checked, onChange, label }: { checked: boolean; onChange: (v
       <span className="flex-1">{label}</span>
       {checked && <Check size={16} className="text-emerald-600"/>}
     </label>
+  )
+}
+
+function Segment<T extends string | boolean>({ options, value, onChange }: { options: [T, string][]; value: T | null; onChange: (value: T) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map(([option, text]) => (
+        <button
+          key={String(option)}
+          type="button"
+          aria-pressed={value === option}
+          onClick={() => onChange(option)}
+          className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition ${value === option ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+        >
+          {option === 'business' && <Building2 size={16}/>}
+          {option === 'individual' && <User size={16}/>}
+          {text}
+        </button>
+      ))}
+    </div>
   )
 }
