@@ -64,7 +64,10 @@ export function Sidebar() {
           <div className="w-9 h-9 rounded-lg bg-white text-slate-950 flex items-center justify-center font-black">XR</div>
           <div>
             <p className="font-bold text-sm">XRANKFLOW OS</p>
-            <p className="text-xs text-slate-400">Business Operating System</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-xs text-slate-400">Business Operating System</p>
+              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">AUTO</span>
+            </div>
           </div>
         </div>
       </div>
