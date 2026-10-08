@@ -25,7 +25,7 @@ const sections = [
       { name: 'Empresas', href: '/brands', icon: Building2 },
       { name: 'CRM', href: '/crm', icon: Users },
       { name: 'Financeiro', href: '/finance', icon: DollarSign },
-      { name: 'Turnover Quotes', href: '/turnover-quotes', icon: ClipboardCheck },
+      { name: 'Airbnb Turnovers', href: '/turnover-quotes', icon: ClipboardCheck },
       { name: 'Marketing', href: '/marketing', icon: Megaphone },
       { name: 'Social Media OS', href: '/social-media', icon: Megaphone },
       { name: 'Automações', href: '/automations', icon: Workflow },
