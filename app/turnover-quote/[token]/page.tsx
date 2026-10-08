@@ -522,7 +522,7 @@ export default function PublicTurnoverQuotePage() {
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">{t.scopeIntro}</p>
               <div className="mt-6 grid gap-3 md:grid-cols-2">
                 {t.scopeItems.map((item, index) => {
-                  const icons = [<Sparkles key="a" size={17}/>, <Home key="b" size={17}/>, <Check key="c" size={17}/>, <Trash2 key="d" size={17}/>, <WashingMachine key="e" size={17}/>, <BedDouble key="f" size={17}/>, <ClipboardCheck key="g" size={17}/>, <ShieldCheck key="h" size={17}/>, <MessageSquare key="i" size={17}/>, <Camera key="j" size={17}/>]
+                  const icons = [<Sparkles key="a" size={17}/>, <Home key="b" size={17}/>, <Check key="c" size={17}/>, <Trash2 key="d" size={17}/>, <RefreshCw key="e" size={17}/>, <BedDouble key="f" size={17}/>, <ClipboardCheck key="g" size={17}/>, <ShieldCheck key="h" size={17}/>, <MessageSquare key="i" size={17}/>, <Camera key="j" size={17}/>]
                   return (
                     <div key={item} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
                       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-slate-900 shadow-sm">{icons[index]}</div>
