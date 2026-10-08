@@ -65,3 +65,16 @@ with check (
         coalesce(current_setting('request.headers', true), '{}')::jsonb ->> 'x-turnover-token'
   )
 );
+
+-- Property photos for the Airbnb listing (taken from the public listing).
+update public.cleaning_turnover_requests
+set photo_urls = array[
+  'https://a0.muscache.com/im/pictures/hosting/Hosting-1750221672127428210/original/607038d5-9644-4a39-997e-4a119ed92deb.png',
+  'https://a0.muscache.com/im/pictures/hosting/Hosting-1750221672127428210/original/a440fe58-d6b2-4857-b99a-232724d1aa20.png',
+  'https://a0.muscache.com/im/pictures/hosting/Hosting-1750221672127428210/original/5ccc00fb-3c23-4535-afbc-b80035c00ce6.png',
+  'https://a0.muscache.com/im/pictures/hosting/Hosting-1750221672127428210/original/fd313079-cc3e-47d6-9b13-cfe5e7fae667.png',
+  'https://a0.muscache.com/im/pictures/hosting/Hosting-1750221672127428210/original/59be6465-51df-4fec-a017-61f4c4fc950c.png'
+]::text[],
+  updated_at = now()
+where airbnb_url like 'https://www.airbnb.com/rooms/1750221672127428210%'
+  and cardinality(photo_urls) = 0;

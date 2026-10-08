@@ -1,15 +1,12 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import {
-  ArrowRight, Bath, BedDouble, Building2, Camera, ChefHat, Check, CheckCircle2,
-  ClipboardCheck, DollarSign, Droplets, ExternalLink, Home, Languages, Loader2,
-  MessageSquare, RefreshCw, ShieldCheck, Shirt, Sparkles, SprayCan, Trash2, Truck, User
-} from 'lucide-react'
+import { Building2, CheckCircle2, ExternalLink, Loader2, ShieldCheck, User } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 
 type Language = 'en' | 'pt' | 'es'
+type CleanerType = 'business' | 'individual'
 
 type PublicRequest = {
   id: string
@@ -24,8 +21,6 @@ type PublicRequest = {
   status: string
 }
 
-type CleanerType = 'business' | 'individual'
-
 const requiredKeys = ['materials', 'laundry', 'paper', 'toilet', 'trash', 'kitchen', 'bathroom', 'equipment'] as const
 type RequiredKey = typeof requiredKeys[number]
 
@@ -34,304 +29,172 @@ const emptyChecks: Record<RequiredKey, boolean> = {
   trash: false, kitchen: false, bathroom: false, equipment: false,
 }
 
-const requiredIcons: Record<RequiredKey, React.ReactNode> = {
-  materials: <SprayCan size={17}/>,
-  laundry: <Shirt size={17}/>,
-  paper: <ClipboardCheck size={17}/>,
-  toilet: <CheckCircle2 size={17}/>,
-  trash: <Trash2 size={17}/>,
-  kitchen: <ChefHat size={17}/>,
-  bathroom: <Droplets size={17}/>,
-  equipment: <Truck size={17}/>,
-}
-
-const field = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-950 focus:ring-4 focus:ring-slate-950/5'
-const label = 'mb-2 block text-[11px] font-black uppercase tracking-[0.14em] text-slate-500'
+const input = 'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-950 outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/10'
+const label = 'mb-1.5 block text-sm font-semibold text-slate-700'
+const section = 'space-y-4 border-t border-slate-200 pt-6'
 
 const copy = {
   en: {
-    language: 'Language',
-    header: 'Cleaning Partner Opportunity',
-    headerSub: 'Airbnb turnover quote portal',
-    badge: 'NOW ACCEPTING QUOTES',
-    heroTitle: 'Submit your quote to become our Airbnb turnover cleaning partner.',
-    heroBody: 'Review the property, service standards and all-inclusive pricing requirements below. If selected, future turnovers can be managed through the same operations portal.',
-    loading: 'Loading quote request…',
+    header: 'Airbnb turnover quote',
+    loading: 'Loading…',
     unavailableTitle: 'Quote request unavailable',
     unavailable: 'This quote request is unavailable.',
     unavailableClosed: 'This quote request is unavailable or bidding has closed.',
-    property: 'PROPERTY',
-    bedrooms: 'bedrooms',
-    bathrooms: 'bathrooms',
+    bedrooms: 'Bedrooms',
+    bathrooms: 'Bathrooms',
     nextTurnover: 'Next turnover',
-    viewListing: 'View Airbnb listing',
-    gallery: 'Property photos',
-    scopeTitle: 'What the turnover includes',
-    scopeIntro: 'Your quote should cover a complete guest-ready reset of the property after checkout.',
-    scopeItems: [
-      'Full cleaning of bedrooms, bathrooms and common areas',
-      'Kitchen cleaning, counters, sink and appliance surfaces',
-      'Floors vacuumed/mopped and visible dust removed',
-      'Trash removed and new trash bags placed',
-      'Laundry completed and linens/towels reset for the next guest',
-      'Beds reset and guest-ready presentation restored',
-      'Paper towels, toilet paper, dish soap, sponges and hand soap restocked',
-      'Cleaning supplies, equipment and transport included in your price',
-      'Report damage, missing items or unusual conditions',
-      'Final completion photos when requested',
-    ],
-    standardTitle: 'Service standard',
-    standardBody: 'The property must be left clean, organized, stocked and ready for the next guest. If something prevents completion, report it immediately instead of marking the turnover complete.',
-    pricingEyebrow: 'ALL-INCLUSIVE PRICING',
-    pricingTitle: 'One total price. No surprise add-ons.',
-    pricingBody: 'Your submitted amount must already include every required item below. Do not submit a base cleaning price and add these charges later.',
-    inclusions: {
-      materials: 'Cleaning supplies & materials',
-      laundry: 'Laundry (linens & towels)',
-      paper: 'Paper towels replaced',
-      toilet: 'Toilet paper replaced',
-      trash: 'New trash bags & trash removal',
-      kitchen: 'Dish soap, sponges & kitchen supplies',
-      bathroom: 'Hand soap & bathroom consumables',
-      equipment: 'Equipment, transport & travel',
-    },
-    processTitle: 'How the selection works',
-    process: [
-      ['Review', 'Review the property, photos and turnover expectations.'],
-      ['Quote', 'Submit your complete all-inclusive price and availability.'],
-      ['Selection', 'We compare quotes and select the cleaning partner.'],
-      ['Operations', 'If selected, future turnovers, follow-ups and payment tracking are managed through XRankFlow.'],
-    ],
-    scope: 'Property notes',
-    defaultScope: 'Standard Airbnb turnover cleaning. Review the property photos and submit your complete all-inclusive price.',
-    formEyebrow: 'CLEANING COMPANY QUOTE',
-    formTitle: 'Submit your quote',
-    formSub: 'Complete the form below. You can submit from your phone in a few minutes.',
-    profileTitle: 'Cleaner profile',
-    opsTitle: 'Operations',
-    cleanerType: 'Cleaner type',
-    cleanerTypes: { business: 'Business', individual: 'Individual / freelancer' },
+    listing: 'View Airbnb listing',
+    photos: 'Photos',
+    rule: 'Leave the property guest-ready. If something blocks the job, report it instead of marking it done.',
+    hostNotes: 'Host notes',
+    formTitle: 'Your quote',
+    formSub: 'One all-inclusive price per turnover.',
+    cleanerType: 'You are',
+    cleanerTypes: { business: 'Business', individual: 'Individual' },
     company: 'Business or cleaner name',
-    contact: 'Contact name',
     email: 'Email',
     phone: 'Phone',
+    contactHelp: 'Add an email or phone number.',
     serviceArea: 'Service area (city or neighborhood)',
     experience: 'Years of experience',
     team: 'Team size',
-    total: 'All-inclusive price per turnover',
-    confirm: 'Confirm your total includes',
-    hours: 'Estimated hours per turnover',
-    insurance: 'Carry liability insurance?',
-    sameDay: 'Available for same-day turnovers?',
+    total: 'Price per turnover, all inclusive',
+    included: 'Included in your price (check all 8)',
+    inclusions: {
+      materials: 'Cleaning supplies',
+      laundry: 'Laundry (linens & towels)',
+      paper: 'Paper towels',
+      toilet: 'Toilet paper',
+      trash: 'Trash bags & removal',
+      kitchen: 'Dish soap & kitchen supplies',
+      bathroom: 'Hand soap & bathroom supplies',
+      equipment: 'Equipment & transport',
+    },
+    hours: 'Hours per turnover',
+    insurance: 'Liability insurance?',
+    sameDay: 'Same-day turnovers?',
     yes: 'Yes',
     no: 'No',
-    availability: 'Availability',
-    availabilityPlaceholder: 'Days/times you are generally available for turnovers',
-    notes: 'Additional notes',
-    notesPlaceholder: 'Experience, scheduling limitations, special services, or anything else we should know',
+    notes: 'Availability & notes',
+    notesPlaceholder: 'When you are available, experience, special services…',
     submit: 'Submit quote',
-    submitReady: 'Ready to submit',
-    confirmHelp: 'Confirm every required inclusion to unlock submission.',
-    contactHelp: 'Provide at least an email or phone number.',
-    privacy: 'Your quote is private. Other cleaning companies cannot see your submitted price.',
-    errorAll: 'The total price must include all required items before you can submit.',
-    errorContact: 'Please provide an email or phone number.',
-    errorSubmit: 'We could not submit the quote. Please review the total price, contact information and included items.',
+    confirmHelp: 'Check all 8 inclusions to submit.',
+    privacy: 'Your quote is private. Other companies cannot see it.',
+    errorAll: 'Check all 8 included items before submitting.',
+    errorContact: 'Add an email or phone number.',
+    errorSubmit: 'We could not submit the quote. Please check the price and included items.',
     sentTitle: 'Quote received',
-    sentBody: 'Thank you. Your quote was submitted successfully and will be reviewed.',
-    sentNext: 'If your company is selected, we will use your contact information for the next step.',
+    sentBody: 'Thank you. We will review your quote and contact you if selected.',
   },
   pt: {
-    language: 'Idioma',
-    header: 'Oportunidade para Empresa de Limpeza',
-    headerSub: 'Portal de orçamento para turnover de Airbnb',
-    badge: 'RECEBENDO ORÇAMENTOS',
-    heroTitle: 'Envie seu orçamento para se tornar nosso parceiro de limpeza de turnover do Airbnb.',
-    heroBody: 'Revise o imóvel, o padrão do serviço e os requisitos de preço completo abaixo. Se selecionado, os próximos turnovers poderão ser administrados pelo mesmo portal operacional.',
-    loading: 'Carregando solicitação…',
+    header: 'Orçamento de turnover Airbnb',
+    loading: 'Carregando…',
     unavailableTitle: 'Solicitação indisponível',
-    unavailable: 'Esta solicitação de orçamento não está disponível.',
+    unavailable: 'Esta solicitação não está disponível.',
     unavailableClosed: 'Esta solicitação não está disponível ou o período de orçamentos foi encerrado.',
-    property: 'IMÓVEL',
-    bedrooms: 'quartos',
-    bathrooms: 'banheiros',
+    bedrooms: 'Quartos',
+    bathrooms: 'Banheiros',
     nextTurnover: 'Próximo turnover',
-    viewListing: 'Ver anúncio no Airbnb',
-    gallery: 'Fotos do imóvel',
-    scopeTitle: 'O que o turnover inclui',
-    scopeIntro: 'Seu orçamento deve cobrir a preparação completa do imóvel para o próximo hóspede após o checkout.',
-    scopeItems: [
-      'Limpeza completa dos quartos, banheiros e áreas comuns',
-      'Limpeza da cozinha, bancadas, pia e superfícies dos eletrodomésticos',
-      'Aspirar/passar pano nos pisos e remover poeira visível',
-      'Retirar o lixo e colocar sacos de lixo novos',
-      'Fazer laundry e preparar roupas de cama/toalhas para o próximo hóspede',
-      'Arrumar as camas e restaurar a apresentação do imóvel',
-      'Repor papel-toalha, papel higiênico, detergente, esponjas e sabonete de mão',
-      'Incluir produtos, equipamentos e transporte no preço',
-      'Reportar danos, itens faltando ou situações fora do normal',
-      'Enviar fotos finais quando solicitado',
-    ],
-    standardTitle: 'Padrão do serviço',
-    standardBody: 'O imóvel deve ficar limpo, organizado, abastecido e pronto para o próximo hóspede. Se algo impedir a conclusão, deve ser reportado imediatamente em vez de marcar o turnover como concluído.',
-    pricingEyebrow: 'PREÇO COMPLETO',
-    pricingTitle: 'Um preço total. Sem cobranças surpresa.',
-    pricingBody: 'O valor enviado deve incluir todos os itens obrigatórios abaixo. Não envie um preço básico para acrescentar cobranças depois.',
-    inclusions: {
-      materials: 'Produtos e materiais de limpeza',
-      laundry: 'Lavanderia (roupas de cama e toalhas)',
-      paper: 'Papel-toalha reposto',
-      toilet: 'Papel higiênico reposto',
-      trash: 'Sacos de lixo novos e retirada do lixo',
-      kitchen: 'Detergente, esponjas e suprimentos de cozinha',
-      bathroom: 'Sabonete de mão e consumíveis do banheiro',
-      equipment: 'Equipamentos, transporte e deslocamento',
-    },
-    processTitle: 'Como funciona a seleção',
-    process: [
-      ['Revisão', 'Revise o imóvel, as fotos e as expectativas do turnover.'],
-      ['Orçamento', 'Envie seu preço completo e sua disponibilidade.'],
-      ['Seleção', 'Nós comparamos as propostas e escolhemos o parceiro de limpeza.'],
-      ['Operação', 'Se selecionado, turnovers futuros, follow-ups e pagamentos serão acompanhados pelo XRankFlow.'],
-    ],
-    scope: 'Observações do imóvel',
-    defaultScope: 'Limpeza padrão de turnover para Airbnb. Revise as fotos e envie seu preço completo com tudo incluído.',
-    formEyebrow: 'ORÇAMENTO DA EMPRESA DE LIMPEZA',
-    formTitle: 'Enviar orçamento',
-    formSub: 'Preencha o formulário abaixo. Você pode enviar pelo celular em poucos minutos.',
-    profileTitle: 'Perfil do prestador',
-    opsTitle: 'Operação',
-    cleanerType: 'Tipo de prestador',
-    cleanerTypes: { business: 'Empresa', individual: 'Pessoa física / autônomo' },
+    listing: 'Ver anúncio no Airbnb',
+    photos: 'Fotos',
+    rule: 'Deixe o imóvel pronto para o próximo hóspede. Se algo impedir o trabalho, reporte em vez de marcar como concluído.',
+    hostNotes: 'Observações do anfitrião',
+    formTitle: 'Seu orçamento',
+    formSub: 'Um preço total por turnover, com tudo incluído.',
+    cleanerType: 'Você é',
+    cleanerTypes: { business: 'Empresa', individual: 'Pessoa física' },
     company: 'Nome da empresa ou do profissional',
-    contact: 'Nome do contato',
     email: 'Email',
     phone: 'Telefone',
+    contactHelp: 'Informe um email ou telefone.',
     serviceArea: 'Região de atendimento (cidade ou bairro)',
     experience: 'Anos de experiência',
     team: 'Tamanho da equipe',
-    total: 'Preço completo por turnover',
-    confirm: 'Confirme que seu preço inclui',
-    hours: 'Horas estimadas por turnover',
-    insurance: 'Possui seguro de responsabilidade civil?',
-    sameDay: 'Atende turnovers no mesmo dia?',
+    total: 'Preço por turnover, tudo incluído',
+    included: 'Incluído no seu preço (marque os 8)',
+    inclusions: {
+      materials: 'Produtos de limpeza',
+      laundry: 'Lavanderia (roupa de cama e toalhas)',
+      paper: 'Papel-toalha',
+      toilet: 'Papel higiênico',
+      trash: 'Sacos de lixo e retirada',
+      kitchen: 'Detergente e itens de cozinha',
+      bathroom: 'Sabonete e itens do banheiro',
+      equipment: 'Equipamentos e transporte',
+    },
+    hours: 'Horas por turnover',
+    insurance: 'Seguro de responsabilidade civil?',
+    sameDay: 'Turnovers no mesmo dia?',
     yes: 'Sim',
     no: 'Não',
-    availability: 'Disponibilidade',
-    availabilityPlaceholder: 'Dias/horários em que você normalmente pode realizar turnovers',
-    notes: 'Observações adicionais',
-    notesPlaceholder: 'Experiência, limitações de agenda, serviços especiais ou algo que devemos saber',
+    notes: 'Disponibilidade e observações',
+    notesPlaceholder: 'Quando você está disponível, experiência, serviços especiais…',
     submit: 'Enviar orçamento',
-    submitReady: 'Pronto para enviar',
-    confirmHelp: 'Confirme todos os itens obrigatórios para liberar o envio.',
-    contactHelp: 'Informe pelo menos um email ou telefone.',
-    privacy: 'Seu orçamento é privado. Outras empresas de limpeza não conseguem ver o preço enviado.',
-    errorAll: 'O preço total deve incluir todos os itens obrigatórios antes do envio.',
+    confirmHelp: 'Marque os 8 itens para enviar.',
+    privacy: 'Seu orçamento é privado. Outras empresas não podem vê-lo.',
+    errorAll: 'Marque os 8 itens incluídos antes de enviar.',
     errorContact: 'Informe um email ou telefone.',
-    errorSubmit: 'Não foi possível enviar o orçamento. Revise o preço total, contato e itens incluídos.',
+    errorSubmit: 'Não foi possível enviar. Revise o preço e os itens incluídos.',
     sentTitle: 'Orçamento recebido',
-    sentBody: 'Obrigado. Seu orçamento foi enviado com sucesso e será analisado.',
-    sentNext: 'Se sua empresa for selecionada, usaremos seus dados de contato para o próximo passo.',
+    sentBody: 'Obrigado. Analisaremos seu orçamento e entraremos em contato se for selecionado.',
   },
   es: {
-    language: 'Idioma',
-    header: 'Oportunidad para Empresa de Limpieza',
-    headerSub: 'Portal de cotización para turnover de Airbnb',
-    badge: 'RECIBIENDO COTIZACIONES',
-    heroTitle: 'Envíe su cotización para convertirse en nuestro socio de limpieza de turnover de Airbnb.',
-    heroBody: 'Revise la propiedad, los estándares del servicio y los requisitos de precio completo. Si es seleccionado, los próximos turnovers podrán gestionarse desde el mismo portal operativo.',
-    loading: 'Cargando solicitud…',
+    header: 'Cotización de turnover Airbnb',
+    loading: 'Cargando…',
     unavailableTitle: 'Solicitud no disponible',
-    unavailable: 'Esta solicitud de cotización no está disponible.',
+    unavailable: 'Esta solicitud no está disponible.',
     unavailableClosed: 'Esta solicitud no está disponible o la recepción de cotizaciones ya cerró.',
-    property: 'PROPIEDAD',
-    bedrooms: 'habitaciones',
-    bathrooms: 'baños',
+    bedrooms: 'Habitaciones',
+    bathrooms: 'Baños',
     nextTurnover: 'Próximo turnover',
-    viewListing: 'Ver anuncio en Airbnb',
-    gallery: 'Fotos de la propiedad',
-    scopeTitle: 'Qué incluye el turnover',
-    scopeIntro: 'Su cotización debe cubrir la preparación completa de la propiedad para el próximo huésped después del checkout.',
-    scopeItems: [
-      'Limpieza completa de habitaciones, baños y áreas comunes',
-      'Limpieza de cocina, encimeras, fregadero y superficies de electrodomésticos',
-      'Aspirar/fregar pisos y retirar polvo visible',
-      'Retirar la basura y colocar bolsas de basura nuevas',
-      'Completar lavandería y preparar ropa de cama/toallas para el próximo huésped',
-      'Preparar camas y restaurar la presentación de la propiedad',
-      'Reponer toallas de papel, papel higiénico, detergente, esponjas y jabón de manos',
-      'Incluir productos, equipos y transporte en el precio',
-      'Reportar daños, artículos faltantes o condiciones inusuales',
-      'Enviar fotos finales cuando se solicite',
-    ],
-    standardTitle: 'Estándar del servicio',
-    standardBody: 'La propiedad debe quedar limpia, organizada, abastecida y lista para el próximo huésped. Si algo impide completar el trabajo, debe reportarse inmediatamente.',
-    pricingEyebrow: 'PRECIO TODO INCLUIDO',
-    pricingTitle: 'Un precio total. Sin cargos sorpresa.',
-    pricingBody: 'El monto enviado debe incluir todos los elementos obligatorios de abajo. No envíe un precio básico para agregar cargos después.',
-    inclusions: {
-      materials: 'Productos y materiales de limpieza',
-      laundry: 'Lavandería (ropa de cama y toallas)',
-      paper: 'Toallas de papel repuestas',
-      toilet: 'Papel higiénico repuesto',
-      trash: 'Bolsas de basura nuevas y retiro de basura',
-      kitchen: 'Detergente, esponjas y suministros de cocina',
-      bathroom: 'Jabón de manos y consumibles del baño',
-      equipment: 'Equipos, transporte y traslado',
-    },
-    processTitle: 'Cómo funciona la selección',
-    process: [
-      ['Revisión', 'Revise la propiedad, las fotos y las expectativas del turnover.'],
-      ['Cotización', 'Envíe su precio completo y disponibilidad.'],
-      ['Selección', 'Comparamos las propuestas y elegimos al socio de limpieza.'],
-      ['Operación', 'Si es seleccionado, los turnovers futuros, seguimientos y pagos se gestionan en XRankFlow.'],
-    ],
-    scope: 'Notas de la propiedad',
-    defaultScope: 'Limpieza estándar de turnover para Airbnb. Revise las fotos y envíe su precio completo con todo incluido.',
-    formEyebrow: 'COTIZACIÓN DE LA EMPRESA DE LIMPIEZA',
-    formTitle: 'Enviar cotización',
-    formSub: 'Complete el formulario. Puede enviarlo desde su teléfono en pocos minutos.',
-    profileTitle: 'Perfil del prestador',
-    opsTitle: 'Operación',
-    cleanerType: 'Tipo de proveedor',
-    cleanerTypes: { business: 'Empresa', individual: 'Persona física / independiente' },
+    listing: 'Ver anuncio en Airbnb',
+    photos: 'Fotos',
+    rule: 'Deje la propiedad lista para el próximo huésped. Si algo impide el trabajo, repórtelo en vez de marcarlo como terminado.',
+    hostNotes: 'Notas del anfitrión',
+    formTitle: 'Su cotización',
+    formSub: 'Un precio total por turnover, todo incluido.',
+    cleanerType: 'Usted es',
+    cleanerTypes: { business: 'Empresa', individual: 'Persona física' },
     company: 'Nombre de la empresa o del profesional',
-    contact: 'Nombre de contacto',
     email: 'Email',
     phone: 'Teléfono',
+    contactHelp: 'Indique un email o teléfono.',
     serviceArea: 'Zona de servicio (ciudad o barrio)',
     experience: 'Años de experiencia',
     team: 'Tamaño del equipo',
-    total: 'Precio completo por turnover',
-    confirm: 'Confirme que su precio incluye',
-    hours: 'Horas estimadas por turnover',
-    insurance: '¿Tiene seguro de responsabilidad civil?',
-    sameDay: '¿Atiende turnovers el mismo día?',
+    total: 'Precio por turnover, todo incluido',
+    included: 'Incluido en su precio (marque los 8)',
+    inclusions: {
+      materials: 'Productos de limpieza',
+      laundry: 'Lavandería (ropa de cama y toallas)',
+      paper: 'Toallas de papel',
+      toilet: 'Papel higiénico',
+      trash: 'Bolsas de basura y retiro',
+      kitchen: 'Detergente y artículos de cocina',
+      bathroom: 'Jabón y artículos del baño',
+      equipment: 'Equipos y transporte',
+    },
+    hours: 'Horas por turnover',
+    insurance: '¿Seguro de responsabilidad civil?',
+    sameDay: '¿Turnovers el mismo día?',
     yes: 'Sí',
     no: 'No',
-    availability: 'Disponibilidad',
-    availabilityPlaceholder: 'Días/horarios en que normalmente puede realizar turnovers',
-    notes: 'Notas adicionales',
-    notesPlaceholder: 'Experiencia, limitaciones de horario, servicios especiales o cualquier otra información',
+    notes: 'Disponibilidad y notas',
+    notesPlaceholder: 'Cuándo está disponible, experiencia, servicios especiales…',
     submit: 'Enviar cotización',
-    submitReady: 'Listo para enviar',
-    confirmHelp: 'Confirme todos los elementos obligatorios para habilitar el envío.',
-    contactHelp: 'Proporcione al menos un email o teléfono.',
-    privacy: 'Su cotización es privada. Otras empresas de limpieza no pueden ver el precio enviado.',
-    errorAll: 'El precio total debe incluir todos los artículos obligatorios antes de enviar.',
-    errorContact: 'Proporcione un email o teléfono.',
-    errorSubmit: 'No pudimos enviar la cotización. Revise el precio total, el contacto y los artículos incluidos.',
+    confirmHelp: 'Marque los 8 artículos para enviar.',
+    privacy: 'Su cotización es privada. Otras empresas no pueden verla.',
+    errorAll: 'Marque los 8 artículos incluidos antes de enviar.',
+    errorContact: 'Indique un email o teléfono.',
+    errorSubmit: 'No pudimos enviar la cotización. Revise el precio y los artículos incluidos.',
     sentTitle: 'Cotización recibida',
-    sentBody: 'Gracias. Su cotización fue enviada correctamente y será revisada.',
-    sentNext: 'Si su empresa es seleccionada, usaremos su información de contacto para el siguiente paso.',
+    sentBody: 'Gracias. Revisaremos su cotización y le contactaremos si es seleccionado.',
   },
 } as const
 
-const dateLocales: Record<Language, string> = {
-  en: 'en-US',
-  pt: 'pt-BR',
-  es: 'es-US',
-}
+const dateLocales: Record<Language, string> = { en: 'en-US', pt: 'pt-BR', es: 'es-US' }
+
+type ErrorKey = 'unavailable' | 'unavailableClosed' | 'errorAll' | 'errorContact' | 'errorSubmit'
 
 export default function PublicTurnoverQuotePage() {
   const params = useParams<{ token: string }>()
@@ -347,11 +210,7 @@ export default function PublicTurnoverQuotePage() {
       'sb_publishable_XbmJA9m7lSEywUBMbsQdSw_gsna1jqq'
 
     return createBrowserClient(url, key, {
-      global: {
-        headers: {
-          'x-turnover-token': token,
-        },
-      },
+      global: { headers: { 'x-turnover-token': token } },
     })
   }, [token])
 
@@ -359,15 +218,14 @@ export default function PublicTurnoverQuotePage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
-  const [errorKey, setErrorKey] = useState<'unavailable' | 'unavailableClosed' | 'errorAll' | 'errorContact' | 'errorSubmit' | null>(null)
+  const [errorKey, setErrorKey] = useState<ErrorKey | null>(null)
   const [cleanerType, setCleanerType] = useState<CleanerType>('business')
   const [checks, setChecks] = useState<Record<RequiredKey, boolean>>(emptyChecks)
   const [insurance, setInsurance] = useState<boolean | null>(null)
   const [sameDay, setSameDay] = useState<boolean | null>(null)
   const [form, setForm] = useState({
-    company_name: '', contact_name: '', email: '', phone: '', service_area: '',
-    years_experience: '', total_price: '', estimated_hours: '', team_size: '',
-    availability_notes: '', notes: ''
+    company_name: '', email: '', phone: '', service_area: '', years_experience: '',
+    team_size: '', total_price: '', estimated_hours: '', availability_notes: '',
   })
 
   useEffect(() => {
@@ -399,19 +257,17 @@ export default function PublicTurnoverQuotePage() {
     void load()
   }, [publicSupabase, token])
 
+  const allIncluded = requiredKeys.every(key => checks[key])
+  const hasContact = Boolean(form.email.trim() || form.phone.trim())
+  const canSubmit = allIncluded && hasContact && Boolean(form.company_name.trim()) && Number(form.total_price) > 0
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setErrorKey(null)
 
     if (!request) return
-    if (!allIncluded) {
-      setErrorKey('errorAll')
-      return
-    }
-    if (!form.email.trim() && !form.phone.trim()) {
-      setErrorKey('errorContact')
-      return
-    }
+    if (!allIncluded) return setErrorKey('errorAll')
+    if (!hasContact) return setErrorKey('errorContact')
 
     setSending(true)
     const { error } = await publicSupabase
@@ -419,7 +275,6 @@ export default function PublicTurnoverQuotePage() {
       .insert({
         request_id: request.id,
         company_name: form.company_name.trim(),
-        contact_name: form.contact_name.trim() || null,
         email: form.email.trim() || null,
         phone: form.phone.trim() || null,
         total_price: Number(form.total_price),
@@ -440,372 +295,219 @@ export default function PublicTurnoverQuotePage() {
         estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
         team_size: form.team_size ? Number(form.team_size) : null,
         availability_notes: form.availability_notes.trim() || null,
-        notes: form.notes.trim() || null,
       })
 
-    if (error) {
-      setErrorKey('errorSubmit')
-      setSending(false)
-      return
-    }
+    setSending(false)
+    if (error) return setErrorKey('errorSubmit')
 
     setSent(true)
-    setSending(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const allIncluded = requiredKeys.every(key => checks[key])
-  const hasContact = Boolean(form.email.trim() || form.phone.trim())
-  const canSubmit = allIncluded && hasContact && Boolean(form.company_name.trim()) && Number(form.total_price) > 0
-
   const languageSwitcher = (
-    <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/10 p-1 backdrop-blur">
-      {([
-        ['en', 'EN'],
-        ['pt', 'PT'],
-        ['es', 'ES'],
-      ] as const).map(([code, name]) => (
+    <div className="flex gap-1 text-xs font-bold">
+      {(['en', 'pt', 'es'] as const).map(code => (
         <button
           key={code}
           type="button"
           onClick={() => setLanguage(code)}
-          className={`rounded-xl px-3 py-2 text-xs font-black transition ${language === code ? 'bg-white text-slate-950 shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
           aria-label={`Change language to ${code}`}
+          className={`rounded-lg px-2.5 py-1.5 uppercase ${language === code ? 'bg-slate-950 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
         >
-          {name}
+          {code}
         </button>
       ))}
     </div>
   )
 
-  if (loading) return (
-    <main className="min-h-screen bg-slate-950 px-5 py-8 text-white">
-      <div className="mx-auto flex max-w-7xl justify-end">{languageSwitcher}</div>
-      <div className="mx-auto mt-24 max-w-xl text-center text-white/60">
-        <Loader2 className="mx-auto mb-4 animate-spin" size={28}/>
-        {t.loading}
+  const shell = (children: React.ReactNode) => (
+    <main className="min-h-screen bg-white text-slate-950">
+      <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
+        <span className="text-sm font-black">XRankFlow</span>
+        {languageSwitcher}
       </div>
+      {children}
     </main>
   )
 
-  if (!request) return (
-    <main className="min-h-screen bg-slate-950 px-5 py-8 text-white">
-      <div className="mx-auto flex max-w-7xl justify-end">{languageSwitcher}</div>
-      <div className="mx-auto mt-20 max-w-xl rounded-3xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl">
-        <ShieldCheck className="mx-auto text-white/70" size={42}/>
-        <h1 className="mt-5 text-3xl font-black">{t.unavailableTitle}</h1>
-        <p className="mt-3 text-white/60">{errorKey ? t[errorKey] : t.unavailable}</p>
-      </div>
-    </main>
+  if (loading) return shell(
+    <div className="flex items-center justify-center gap-2 py-24 text-slate-500">
+      <Loader2 className="animate-spin" size={18}/>{t.loading}
+    </div>
   )
 
-  if (sent) {
-    return (
-      <main className="min-h-screen bg-slate-950 px-5 py-8 text-white">
-        <div className="mx-auto flex max-w-7xl justify-end">{languageSwitcher}</div>
-        <div className="mx-auto mt-16 max-w-2xl overflow-hidden rounded-[2rem] border border-emerald-400/20 bg-white text-slate-950 shadow-2xl">
-          <div className="bg-emerald-50 p-8 text-center sm:p-12">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg">
-              <CheckCircle2 size={42}/>
-            </div>
-            <h1 className="mt-6 text-4xl font-black tracking-tight">{t.sentTitle}</h1>
-            <p className="mx-auto mt-3 max-w-lg text-lg text-slate-600">{t.sentBody}</p>
-            <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">{t.sentNext}</p>
-          </div>
-          <div className="grid gap-3 border-t border-slate-100 p-6 sm:grid-cols-3">
-            <SuccessItem icon={<ClipboardCheck size={18}/>} text={t.submitReady}/>
-            <SuccessItem icon={<ShieldCheck size={18}/>} text={t.privacy}/>
-            <SuccessItem icon={<MessageSquare size={18}/>} text={t.sentNext}/>
-          </div>
+  if (!request) return shell(
+    <div className="mx-auto max-w-md px-4 py-16 text-center">
+      <ShieldCheck className="mx-auto text-slate-400" size={36}/>
+      <h1 className="mt-4 text-2xl font-black">{t.unavailableTitle}</h1>
+      <p className="mt-2 text-slate-600">{errorKey ? t[errorKey] : t.unavailable}</p>
+    </div>
+  )
+
+  if (sent) return shell(
+    <div className="mx-auto max-w-md px-4 py-16 text-center">
+      <CheckCircle2 className="mx-auto text-emerald-600" size={48}/>
+      <h1 className="mt-4 text-2xl font-black">{t.sentTitle}</h1>
+      <p className="mt-2 text-slate-600">{t.sentBody}</p>
+    </div>
+  )
+
+  const photos = request.photo_urls ?? []
+
+  return shell(
+    <div className="mx-auto max-w-3xl px-4 pb-16">
+      {photos.length > 0 && (
+        <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0">
+          {photos.map((url, index) => (
+            <a
+              key={url}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className={`snap-start shrink-0 overflow-hidden rounded-2xl bg-slate-100 ${index === 0 ? 'w-[85%] sm:col-span-2 sm:row-span-2 sm:w-auto' : 'w-[60%] sm:w-auto'}`}
+            >
+              <img src={url} alt={`${t.photos} ${index + 1}`} loading={index === 0 ? 'eager' : 'lazy'} className="aspect-[4/3] h-full w-full object-cover"/>
+            </a>
+          ))}
         </div>
-      </main>
-    )
-  }
+      )}
 
-  const heroPhoto = request.photo_urls?.[0]
-
-  return (
-    <main className="min-h-screen bg-[#f5f7f9] text-slate-950">
-      <header className="absolute inset-x-0 top-0 z-30">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-          <div className="flex items-center gap-3 text-white">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white font-black text-slate-950 shadow-lg">XR</div>
-            <div>
-              <p className="text-sm font-black">{t.header}</p>
-              <p className="text-xs text-white/65">{t.headerSub}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Languages size={17} className="hidden text-white/70 sm:block"/>
-            {languageSwitcher}
-          </div>
+      <div className="mt-6">
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">{request.property_name}</h1>
+        <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+          <Fact label={t.bedrooms} value={String(request.bedrooms ?? '—')}/>
+          <Fact label={t.bathrooms} value={String(request.bathrooms ?? '—')}/>
+          <Fact
+            label={t.nextTurnover}
+            value={request.turnover_date ? new Date(request.turnover_date + 'T12:00:00').toLocaleDateString(dateLocales[language], { month: 'short', day: 'numeric' }) : 'TBD'}
+          />
         </div>
-      </header>
-
-      <section className="relative overflow-hidden bg-slate-950 text-white">
-        {heroPhoto && (
-          <>
-            <img src={heroPhoto} alt={request.property_name} className="absolute inset-0 h-full w-full object-cover opacity-35"/>
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-slate-950/35"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/40"/>
-          </>
+        {request.airbnb_url && (
+          <a href={request.airbnb_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700 underline underline-offset-4">
+            {t.listing}<ExternalLink size={14}/>
+          </a>
         )}
-        <div className="relative mx-auto max-w-7xl px-5 pb-16 pt-32 sm:px-8 sm:pb-20 sm:pt-36 lg:pb-24">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-black tracking-[0.12em] text-emerald-200">
-              <Sparkles size={14}/>{t.badge}
+        <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">{t.rule}</p>
+        {request.turnover_notes && (
+          <div className="mt-3 rounded-xl border border-slate-200 p-4 text-sm leading-6 text-slate-600">
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">{t.hostNotes}</p>
+            <p className="whitespace-pre-wrap">{request.turnover_notes}</p>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={submit} className="mt-8">
+        <h2 className="text-xl font-black">{t.formTitle}</h2>
+        <p className="text-sm text-slate-500">{t.formSub}</p>
+
+        {errorKey && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{t[errorKey]}</p>}
+
+        <div className={section}>
+          <div>
+            <p className={label}>{t.cleanerType}</p>
+            <Segment<CleanerType>
+              options={[['business', t.cleanerTypes.business], ['individual', t.cleanerTypes.individual]]}
+              value={cleanerType}
+              onChange={setCleanerType}
+            />
+          </div>
+          <div>
+            <label className={label} htmlFor="company">{t.company} *</label>
+            <input id="company" className={input} required maxLength={160} value={form.company_name} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}/>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={label} htmlFor="email">{t.email}</label>
+              <input id="email" type="email" className={input} maxLength={240} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}/>
             </div>
-            <h1 className="mt-6 text-4xl font-black leading-[1.04] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
-              {t.heroTitle}
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/70 sm:text-lg">
-              {t.heroBody}
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#quote-form" className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-xl transition hover:-translate-y-0.5">
-                {t.formTitle}<ArrowRight size={17}/>
-              </a>
-              {request.airbnb_url && (
-                <a href={request.airbnb_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/15">
-                  {t.viewListing}<ExternalLink size={16}/>
-                </a>
-              )}
+            <div>
+              <label className={label} htmlFor="phone">{t.phone}</label>
+              <input id="phone" inputMode="tel" className={input} maxLength={80} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}/>
+            </div>
+          </div>
+          {!hasContact && <p className="-mt-2 text-xs text-amber-600">{t.contactHelp}</p>}
+          <div>
+            <label className={label} htmlFor="area">{t.serviceArea}</label>
+            <input id="area" className={input} maxLength={160} value={form.service_area} onChange={e => setForm(f => ({ ...f, service_area: e.target.value }))}/>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={label} htmlFor="experience">{t.experience}</label>
+              <input id="experience" type="number" min="0" max="80" inputMode="numeric" className={input} value={form.years_experience} onChange={e => setForm(f => ({ ...f, years_experience: e.target.value }))}/>
+            </div>
+            <div>
+              <label className={label} htmlFor="team">{t.team}</label>
+              <input id="team" type="number" min="1" max="50" inputMode="numeric" className={input} value={form.team_size} onChange={e => setForm(f => ({ ...f, team_size: e.target.value }))}/>
             </div>
           </div>
         </div>
-      </section>
 
-      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-        <section className="-mt-14 relative z-20 grid overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat icon={<Home size={20}/>} label={t.property} value={request.property_name}/>
-          <Stat icon={<BedDouble size={20}/>} label={t.bedrooms} value={String(request.bedrooms ?? '—')}/>
-          <Stat icon={<Bath size={20}/>} label={t.bathrooms} value={String(request.bathrooms ?? '—')}/>
-          <Stat icon={<ClipboardCheck size={20}/>} label={t.nextTurnover} value={request.turnover_date ? new Date(request.turnover_date + 'T12:00:00').toLocaleDateString(dateLocales[language], { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}/>
-        </section>
+        <div className={section}>
+          <div>
+            <label className={label} htmlFor="total">{t.total} *</label>
+            <div className="flex items-center rounded-xl border border-slate-300 px-3.5 focus-within:border-slate-950 focus-within:ring-2 focus-within:ring-slate-950/10">
+              <span className="text-xl font-black text-slate-500">$</span>
+              <input id="total" required min="1" max="100000" step="0.01" type="number" inputMode="decimal" placeholder="0.00"
+                className="w-full bg-transparent py-3 pl-1 text-2xl font-black outline-none"
+                value={form.total_price} onChange={e => setForm(f => ({ ...f, total_price: e.target.value }))}/>
+            </div>
+          </div>
 
-        {request.photo_urls?.length > 0 && (
-          <section className="mt-10">
-            <SectionHeader eyebrow={t.property} title={t.gallery}/>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {request.photo_urls.slice(0, 8).map((url, index) => (
-                <a key={url} href={url} target="_blank" rel="noreferrer" className={`group relative overflow-hidden rounded-3xl bg-slate-200 ${index === 0 ? 'col-span-2 row-span-2' : ''}`}>
-                  <img src={url} alt={`${t.gallery} ${index + 1}`} className="aspect-[4/3] h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"/>
-                  <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10"/>
-                </a>
+          <div>
+            <p className={label}>{t.included}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {requiredKeys.map(key => (
+                <label key={key} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm font-semibold transition ${checks[key] ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-300 text-slate-700 hover:border-slate-400'}`}>
+                  <input type="checkbox" className="h-4 w-4 accent-white" checked={checks[key]} onChange={e => setChecks(c => ({ ...c, [key]: e.target.checked }))}/>
+                  {t.inclusions[key]}
+                </label>
               ))}
             </div>
-          </section>
-        )}
-
-        <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_430px] xl:grid-cols-[1fr_470px]">
-          <div className="space-y-8">
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <SectionHeader eyebrow={t.property} title={t.scopeTitle}/>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">{t.scopeIntro}</p>
-              <div className="mt-6 grid gap-3 md:grid-cols-2">
-                {t.scopeItems.map((item, index) => {
-                  const icons = [<Sparkles key="a" size={17}/>, <Home key="b" size={17}/>, <Check key="c" size={17}/>, <Trash2 key="d" size={17}/>, <RefreshCw key="e" size={17}/>, <BedDouble key="f" size={17}/>, <ClipboardCheck key="g" size={17}/>, <ShieldCheck key="h" size={17}/>, <MessageSquare key="i" size={17}/>, <Camera key="j" size={17}/>]
-                  return (
-                    <div key={item} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-slate-900 shadow-sm">{icons[index]}</div>
-                      <p className="text-sm font-semibold leading-5 text-slate-700">{item}</p>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 shrink-0 text-blue-700" size={20}/>
-                  <div>
-                    <p className="font-black text-blue-950">{t.standardTitle}</p>
-                    <p className="mt-1 text-sm leading-6 text-blue-900/75">{t.standardBody}</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="overflow-hidden rounded-[2rem] bg-slate-950 p-6 text-white shadow-xl sm:p-8">
-              <p className="text-xs font-black tracking-[0.16em] text-amber-300">{t.pricingEyebrow}</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight">{t.pricingTitle}</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65 sm:text-base">{t.pricingBody}</p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {requiredKeys.map(key => (
-                  <Inclusion key={key} icon={requiredIcons[key]} text={t.inclusions[key]}/>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <SectionHeader eyebrow="XRankFlow" title={t.processTitle}/>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {t.process.map(([title, body], index) => (
-                  <div key={title} className="rounded-2xl border border-slate-100 p-5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-white">{index + 1}</div>
-                    <h3 className="mt-4 font-black">{title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-              <SectionHeader eyebrow={t.property} title={t.scope}/>
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600 sm:text-base">{request.turnover_notes || t.defaultScope}</p>
-              {request.property_address && (
-                <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">{t.property}</p>
-                  <p className="mt-1 font-bold text-slate-800">{request.property_address}</p>
-                </div>
-              )}
-            </section>
           </div>
-
-          <aside id="quote-form">
-            <form onSubmit={submit} className="sticky top-5 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
-              <div className="border-b border-slate-100 bg-slate-950 p-6 text-white sm:p-7">
-                <div className="flex items-center gap-2 text-[11px] font-black tracking-[0.14em] text-emerald-300">
-                  <DollarSign size={15}/>{t.formEyebrow}
-                </div>
-                <h2 className="mt-2 text-3xl font-black tracking-tight">{t.formTitle}</h2>
-                <p className="mt-2 text-sm leading-6 text-white/60">{t.formSub}</p>
-              </div>
-
-              <div className="p-5 sm:p-6">
-                {errorKey && <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-700">{t[errorKey]}</div>}
-
-                <div className="space-y-5">
-                  <p className={label}>{t.profileTitle}</p>
-
-                  <div>
-                    <label className={label}>{t.cleanerType}</label>
-                    <Segment<CleanerType>
-                      options={[['business', t.cleanerTypes.business], ['individual', t.cleanerTypes.individual]]}
-                      value={cleanerType}
-                      onChange={setCleanerType}
-                    />
-                  </div>
-
-                  <div><label className={label}>{t.company} *</label><input className={field} required maxLength={160} value={form.company_name} onChange={e => setForm(f => ({...f, company_name:e.target.value}))}/></div>
-                  <div><label className={label}>{t.contact}</label><input className={field} maxLength={160} value={form.contact_name} onChange={e => setForm(f => ({...f, contact_name:e.target.value}))}/></div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                    <div><label className={label}>{t.email}</label><input className={field} type="email" maxLength={240} value={form.email} onChange={e => setForm(f => ({...f, email:e.target.value}))}/></div>
-                    <div><label className={label}>{t.phone}</label><input className={field} inputMode="tel" maxLength={80} value={form.phone} onChange={e => setForm(f => ({...f, phone:e.target.value}))}/></div>
-                  </div>
-                  {!hasContact && <p className="-mt-2 text-xs text-amber-600">{t.contactHelp}</p>}
-
-                  <div><label className={label}>{t.serviceArea}</label><input className={field} maxLength={160} value={form.service_area} onChange={e => setForm(f => ({...f, service_area:e.target.value}))}/></div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><label className={label}>{t.experience}</label><input className={field} min="0" max="80" type="number" inputMode="numeric" value={form.years_experience} onChange={e => setForm(f => ({...f, years_experience:e.target.value}))}/></div>
-                    <div><label className={label}>{t.team}</label><input className={field} min="1" max="50" type="number" inputMode="numeric" value={form.team_size} onChange={e => setForm(f => ({...f, team_size:e.target.value}))}/></div>
-                  </div>
-
-                  <div className="rounded-3xl bg-slate-950 p-5 text-white">
-                    <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.14em] text-white/50">{t.total} *</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-3xl font-black">$</span>
-                      <input className="w-full bg-transparent text-4xl font-black tracking-tight outline-none placeholder:text-white/20" required min="1" max="100000" step="0.01" type="number" inputMode="decimal" placeholder="0.00" value={form.total_price} onChange={e => setForm(f => ({...f, total_price:e.target.value}))}/>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className={label}>{t.confirm} *</p>
-                    <div className="space-y-2.5">
-                      {requiredKeys.map(key => (
-                        <CheckBox key={key} checked={checks[key]} onChange={v => setChecks(c => ({...c, [key]: v}))} label={t.inclusions[key]}/>
-                      ))}
-                    </div>
-                  </div>
-
-                  <p className={label}>{t.opsTitle}</p>
-
-                  <div><label className={label}>{t.hours}</label><input className={field} min="0.5" max="168" step="0.5" type="number" inputMode="decimal" value={form.estimated_hours} onChange={e => setForm(f => ({...f, estimated_hours:e.target.value}))}/></div>
-
-                  <div>
-                    <label className={label}>{t.insurance}</label>
-                    <Segment<boolean> options={[[true, t.yes], [false, t.no]]} value={insurance} onChange={setInsurance}/>
-                  </div>
-
-                  <div>
-                    <label className={label}>{t.sameDay}</label>
-                    <Segment<boolean> options={[[true, t.yes], [false, t.no]]} value={sameDay} onChange={setSameDay}/>
-                  </div>
-
-                  <div><label className={label}>{t.availability}</label><textarea className={field} maxLength={1200} rows={3} value={form.availability_notes} onChange={e => setForm(f => ({...f, availability_notes:e.target.value}))} placeholder={t.availabilityPlaceholder}/></div>
-                  <div><label className={label}>{t.notes}</label><textarea className={field} maxLength={3000} rows={4} value={form.notes} onChange={e => setForm(f => ({...f, notes:e.target.value}))} placeholder={t.notesPlaceholder}/></div>
-
-                  <button disabled={sending || !canSubmit} className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35">
-                    {sending ? <Loader2 size={18} className="animate-spin"/> : <CheckCircle2 size={18}/>}
-                    {t.submit}
-                    {!sending && <ArrowRight size={17} className="transition group-hover:translate-x-0.5"/>}
-                  </button>
-
-                  {!allIncluded && <p className="text-center text-xs leading-5 text-slate-400">{t.confirmHelp}</p>}
-                  <div className="flex items-start gap-2 rounded-2xl bg-slate-50 p-4 text-xs leading-5 text-slate-500">
-                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-slate-700"/>
-                    <span>{t.privacy}</span>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </aside>
         </div>
-      </div>
 
-      <footer className="mt-8 border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-7 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <span>XRankFlow Turnover Operations</span>
-          <span>{t.headerSub}</span>
+        <div className={section}>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className={label} htmlFor="hours">{t.hours}</label>
+              <input id="hours" type="number" min="0.5" max="168" step="0.5" inputMode="decimal" className={input} value={form.estimated_hours} onChange={e => setForm(f => ({ ...f, estimated_hours: e.target.value }))}/>
+            </div>
+            <div>
+              <p className={label}>{t.insurance}</p>
+              <Segment<boolean> options={[[true, t.yes], [false, t.no]]} value={insurance} onChange={setInsurance}/>
+            </div>
+            <div>
+              <p className={label}>{t.sameDay}</p>
+              <Segment<boolean> options={[[true, t.yes], [false, t.no]]} value={sameDay} onChange={setSameDay}/>
+            </div>
+          </div>
+          <div>
+            <label className={label} htmlFor="notes">{t.notes}</label>
+            <textarea id="notes" rows={3} maxLength={1200} className={input} placeholder={t.notesPlaceholder} value={form.availability_notes} onChange={e => setForm(f => ({ ...f, availability_notes: e.target.value }))}/>
+          </div>
         </div>
-      </footer>
-    </main>
-  )
-}
 
-function SectionHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
-  return (
-    <div>
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">{eyebrow}</p>
-      <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{title}</h2>
+        <div className="mt-8">
+          <button disabled={sending || !canSubmit} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-4 text-base font-black text-white disabled:cursor-not-allowed disabled:opacity-30">
+            {sending && <Loader2 className="animate-spin" size={18}/>}
+            {t.submit}
+          </button>
+          {!allIncluded && <p className="mt-2 text-center text-xs text-slate-500">{t.confirmHelp}</p>}
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-400">
+            <ShieldCheck size={14}/>{t.privacy}
+          </p>
+        </div>
+      </form>
     </div>
   )
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-b border-slate-100 p-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 sm:p-6">
-      <div className="flex items-center gap-2 text-slate-400">{icon}<span className="text-[10px] font-black uppercase tracking-[0.15em]">{label}</span></div>
-      <p className="mt-2 truncate text-lg font-black text-slate-950" title={value}>{value}</p>
+    <div className="rounded-xl border border-slate-200 p-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate font-black">{value}</p>
     </div>
-  )
-}
-
-function Inclusion({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-950">{icon}</div>
-      <span className="text-sm font-bold text-white/85">{text}</span>
-    </div>
-  )
-}
-
-function SuccessItem({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-2xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-      <span className="mt-0.5 text-emerald-600">{icon}</span>
-      <span>{text}</span>
-    </div>
-  )
-}
-
-function CheckBox({ checked, onChange, label }: { checked: boolean; onChange: (value:boolean) => void; label: string }) {
-  return (
-    <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 text-sm font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-950' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}>
-      <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={checked} onChange={e => onChange(e.target.checked)}/>
-      <span className="flex-1">{label}</span>
-      {checked && <Check size={16} className="text-emerald-600"/>}
-    </label>
   )
 }
 
@@ -818,10 +520,10 @@ function Segment<T extends string | boolean>({ options, value, onChange }: { opt
           type="button"
           aria-pressed={value === option}
           onClick={() => onChange(option)}
-          className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition ${value === option ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+          className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-3 text-sm font-semibold transition ${value === option ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-300 text-slate-600 hover:border-slate-400'}`}
         >
-          {option === 'business' && <Building2 size={16}/>}
-          {option === 'individual' && <User size={16}/>}
+          {option === 'business' && <Building2 size={15}/>}
+          {option === 'individual' && <User size={15}/>}
           {text}
         </button>
       ))}
