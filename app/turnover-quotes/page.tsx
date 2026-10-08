@@ -20,6 +20,7 @@ type TurnoverRequest = {
   turnover_date: string | null
   turnover_notes: string | null
   photo_urls: string[]
+  extra_inclusions: string[]
   status: 'open' | 'closed' | 'awarded'
   awarded_quote_id: string | null
   awarded_vendor_id: string | null
@@ -36,13 +37,17 @@ type Quote = {
   total_price: number
   estimated_hours: number | null
   team_size: number | null
-  cleaner_type: 'business' | 'individual' | null
-  service_area: string | null
-  years_experience: number | null
-  has_insurance: boolean | null
-  same_day_available: boolean | null
   availability_notes: string | null
   notes: string | null
+  minimum_notice_hours: number | null
+  same_day_turnover: boolean | null
+  equipment_details: string | null
+  laundry_method: 'on_site' | 'off_site' | 'both' | null
+  laundry_process: string | null
+  years_experience: number | null
+  has_insurance: boolean | null
+  completion_photos_agreed: boolean | null
+  confirmed_inclusions: string[]
   submitted_at: string
 }
 
@@ -138,6 +143,17 @@ export default function TurnoverOperationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [photos, setPhotos] = useState<File[]>([])
+  const [editPhotos, setEditPhotos] = useState<File[]>([])
+  const [quickSetupOpen, setQuickSetupOpen] = useState(true)
+  const [editForm, setEditForm] = useState({
+    property_name: '',
+    property_address: '',
+    airbnb_url: '',
+    bedrooms: '3',
+    bathrooms: '2',
+    turnover_notes: '',
+    extra_inclusions: '',
+  })
   const [quoteForm, setQuoteForm] = useState({
     property_name: '',
     property_address: '',
@@ -146,6 +162,7 @@ export default function TurnoverOperationsPage() {
     bathrooms: '2',
     turnover_date: '',
     turnover_notes: '',
+    extra_inclusions: '',
   })
   const [reservationForm, setReservationForm] = useState({
     reservation_code: '',
@@ -201,6 +218,24 @@ export default function TurnoverOperationsPage() {
   useEffect(() => { void load() }, [])
 
   const selected = requests.find(r => r.id === selectedId) || null
+
+  useEffect(() => {
+    const record = requests.find(r => r.id === selectedId)
+    if (!record) return
+    setEditForm({
+      property_name: record.property_name,
+      property_address: record.property_address || '',
+      airbnb_url: record.airbnb_url || '',
+      bedrooms: String(record.bedrooms ?? '3'),
+      bathrooms: String(record.bathrooms ?? '2'),
+      turnover_notes: record.turnover_notes || '',
+      extra_inclusions: (record.extra_inclusions || []).join('\n'),
+    })
+    setEditPhotos([])
+  }, [selectedId])
+
+  const parseRequirements = (value: string) => [...new Set(value.split(/\r?\n/).map(item => item.trim()).filter(Boolean))].slice(0, 12)
+
   const selectedQuotes = useMemo(
     () => quotes.filter(q => q.request_id === selectedId).sort((a, b) => Number(a.total_price) - Number(b.total_price)),
     [quotes, selectedId]
@@ -256,6 +291,7 @@ export default function TurnoverOperationsPage() {
         bathrooms: quoteForm.bathrooms ? Number(quoteForm.bathrooms) : null,
         turnover_date: quoteForm.turnover_date || null,
         turnover_notes: quoteForm.turnover_notes.trim() || null,
+        extra_inclusions: parseRequirements(quoteForm.extra_inclusions),
       })
       .select('*')
       .single()
@@ -287,12 +323,69 @@ export default function TurnoverOperationsPage() {
         .eq('id', created.id)
     }
 
-    setQuoteForm({ property_name: '', property_address: '', airbnb_url: '', bedrooms: '3', bathrooms: '2', turnover_date: '', turnover_notes: '' })
+    setQuoteForm({ property_name: '', property_address: '', airbnb_url: '', bedrooms: '3', bathrooms: '2', turnover_date: '', turnover_notes: '', extra_inclusions: '' })
     setPhotos([])
     setMessage('Quote request created.')
     setSaving(false)
     await load()
     setSelectedId(created.id)
+  }
+
+  const saveQuickSetup = async () => {
+    if (!selected) return
+    if (editForm.property_name.trim().length < 2) {
+      setMessage('Property name is required.')
+      return
+    }
+    setSaving(true)
+    const newUrls: string[] = []
+    const failures: string[] = []
+    for (const file of editPhotos) {
+      if (file.size > 8 * 1024 * 1024 || !['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(file.type)) {
+        failures.push(file.name)
+        continue
+      }
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
+      const path = `${selected.id}/${crypto.randomUUID()}-${safeName}`
+      const upload = await supabase.storage.from('cleaning-turnover-photos').upload(path, file, { upsert: false })
+      if (upload.error) {
+        failures.push(file.name)
+        continue
+      }
+      const { data } = supabase.storage.from('cleaning-turnover-photos').getPublicUrl(path)
+      if (data.publicUrl) newUrls.push(data.publicUrl)
+    }
+    const payload = {
+      property_name: editForm.property_name.trim(),
+      property_address: editForm.property_address.trim() || null,
+      airbnb_url: editForm.airbnb_url.trim() || null,
+      bedrooms: editForm.bedrooms ? Number(editForm.bedrooms) : null,
+      bathrooms: editForm.bathrooms ? Number(editForm.bathrooms) : null,
+      turnover_notes: editForm.turnover_notes.trim() || null,
+      extra_inclusions: parseRequirements(editForm.extra_inclusions),
+      photo_urls: [...(selected.photo_urls || []), ...newUrls],
+    }
+    const { data, error } = await supabase.from('cleaning_turnover_requests')
+      .update(payload).eq('id', selected.id).select('*').single()
+    if (error || !data) setMessage(error?.message || 'Could not save property setup.')
+    else {
+      setRequests(current => current.map(item => item.id === selected.id ? data as TurnoverRequest : item))
+      setEditPhotos([])
+      setMessage(failures.length ? `Saved property. ${failures.length} photo(s) failed; check image format and 8 MB limit.` : 'Property saved. Your public quote link stays the same.')
+    }
+    setSaving(false)
+  }
+
+  const removePropertyPhoto = async (url: string) => {
+    if (!selected) return
+    const next = (selected.photo_urls || []).filter(photo => photo !== url)
+    const { error } = await supabase.from('cleaning_turnover_requests')
+      .update({ photo_urls: next }).eq('id', selected.id)
+    if (error) setMessage(error.message)
+    else {
+      setRequests(current => current.map(item => item.id === selected.id ? {...item,photo_urls:next} : item))
+      setMessage('Photo removed from the public gallery.')
+    }
   }
 
   const awardQuote = async (quote: Quote) => {
@@ -664,6 +757,53 @@ export default function TurnoverOperationsPage() {
         </select>
       </div>
 
+      
+      {selected && <section className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">QUICK SETUP</p>
+            <h2 className="mt-1 text-lg font-black">Edit property, requirements & photos</h2>
+            <p className="text-xs text-slate-500">Update this Airbnb without replacing the public quote link.</p>
+          </div>
+          <button onClick={() => setQuickSetupOpen(v => !v)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black">{quickSetupOpen ? 'Hide setup' : 'Open setup'}</button>
+        </div>
+        {quickSetupOpen && (
+          <div className="grid gap-5 border-t border-slate-100 p-4 sm:p-5 xl:grid-cols-2">
+            <div className="space-y-3">
+              <div><label className={label}>Property name</label><input className={input} value={editForm.property_name} onChange={e=>setEditForm(f=>({...f,property_name:e.target.value}))}/></div>
+              <div><label className={label}>Airbnb listing link</label><input type="url" className={input} value={editForm.airbnb_url} onChange={e=>setEditForm(f=>({...f,airbnb_url:e.target.value}))}/></div>
+              <div><label className={label}>Address (optional)</label><input className={input} value={editForm.property_address} onChange={e=>setEditForm(f=>({...f,property_address:e.target.value}))}/></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={label}>Bedrooms</label><input className={input} type="number" min="0" max="50" step="0.5" value={editForm.bedrooms} onChange={e=>setEditForm(f=>({...f,bedrooms:e.target.value}))}/></div>
+                <div><label className={label}>Bathrooms</label><input className={input} type="number" min="0" max="50" step="0.5" value={editForm.bathrooms} onChange={e=>setEditForm(f=>({...f,bathrooms:e.target.value}))}/></div>
+              </div>
+              <div><label className={label}>Turnover instructions</label><textarea className={input} rows={4} value={editForm.turnover_notes} onChange={e=>setEditForm(f=>({...f,turnover_notes:e.target.value}))}/></div>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-xl bg-slate-950 p-4 text-white">
+                <p className="text-xs font-black">Included in every quote</p>
+                <p className="mt-2 text-xs leading-5 text-white/75">Cleaning materials, laundry (wash used sheets and towels after checkout; fresh linens before check-in), paper towels and toilet paper.</p>
+              </div>
+              <div><label className={label}>Extra required items — one per line</label><textarea className={input} rows={4} value={editForm.extra_inclusions} onChange={e=>setEditForm(f=>({...f,extra_inclusions:e.target.value}))} placeholder="Dishwasher pods&#10;Trash bags&#10;Bathroom amenities"/></div>
+              <div>
+                <label className={label}>Upload additional property photos</label>
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-xs font-bold">
+                  <Camera size={16}/>{editPhotos.length ? `${editPhotos.length} photo(s) selected` : 'Choose photos (max 8 MB each)'}
+                  <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple onChange={e=>setEditPhotos(Array.from(e.target.files || []))}/>
+                </label>
+              </div>
+              {selected.photo_urls?.length > 0 && <div className="grid grid-cols-4 gap-2">
+                {selected.photo_urls.map(url=><div key={url} className="relative">
+                  <img src={url} alt="Property" className="aspect-square w-full rounded-lg object-cover"/>
+                  <button onClick={()=>void removePropertyPhoto(url)} aria-label="Remove photo" className="absolute right-1 top-1 rounded-full bg-white px-1.5 py-0.5 text-xs font-black text-red-700 shadow">×</button>
+                </div>)}
+              </div>}
+              <button disabled={saving} onClick={()=>void saveQuickSetup()} className="w-full rounded-xl bg-slate-950 p-3 text-sm font-black text-white disabled:opacity-50">{saving?'Saving…':'Save property setup'}</button>
+            </div>
+          </div>
+        )}
+      </section>}
+
       <div className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2">
         {nav.map(item => (
           <button
@@ -691,6 +831,7 @@ export default function TurnoverOperationsPage() {
                 <div><label className={label}>Bathrooms</label><input className={input} type="number" min="0" step="0.5" value={quoteForm.bathrooms} onChange={e => setQuoteForm(f => ({...f, bathrooms:e.target.value}))}/></div>
               </div>
               <div><label className={label}>Instructions</label><textarea className={input} rows={4} value={quoteForm.turnover_notes} onChange={e => setQuoteForm(f => ({...f, turnover_notes:e.target.value}))}/></div>
+              <div><label className={label}>Extra items required (one per line)</label><textarea className={input} rows={3} value={quoteForm.extra_inclusions} onChange={e => setQuoteForm(f => ({...f,extra_inclusions:e.target.value}))} placeholder="Dishwasher pods&#10;Trash bags"/></div>
               <div>
                 <label className={label}>Property photos</label>
                 <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-bold text-slate-700">
@@ -699,7 +840,7 @@ export default function TurnoverOperationsPage() {
                 </label>
               </div>
               <div className="rounded-xl bg-slate-950 p-4 text-xs text-slate-200">
-                Every submitted price must already include cleaning supplies, laundry, paper towels, toilet paper, trash bags and removal, kitchen and bathroom consumables, and equipment/transport.
+                Every submitted price must already include cleaning supplies, laundry, paper towels, and toilet paper.
               </div>
               <button disabled={saving} onClick={() => void createRequest()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-50">
                 {saving ? <Loader2 size={17} className="animate-spin"/> : <Sparkles size={17}/>}Create quote request
@@ -740,15 +881,20 @@ export default function TurnoverOperationsPage() {
                       <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
                         {quote.estimated_hours && <span>{quote.estimated_hours} hours</span>}
                         {quote.team_size && <span>{quote.team_size} cleaner{quote.team_size === 1 ? '' : 's'}</span>}
-                        {quote.cleaner_type && <span>{quote.cleaner_type === 'business' ? 'Business' : 'Individual'}</span>}
-                        {quote.service_area && <span>{quote.service_area}</span>}
-                        {quote.years_experience != null && <span>{quote.years_experience} yr{quote.years_experience === 1 ? '' : 's'} experience</span>}
-                        {quote.has_insurance != null && <span>{quote.has_insurance ? 'Insured' : 'No liability insurance'}</span>}
-                        {quote.same_day_available != null && <span>{quote.same_day_available ? 'Same-day turnovers' : 'No same-day turnovers'}</span>}
                         <span>{new Date(quote.submitted_at).toLocaleString()}</span>
                       </div>
                       {quote.availability_notes && <p className="mt-3 text-sm"><b>Availability:</b> {quote.availability_notes}</p>}
                       {quote.notes && <p className="mt-2 text-sm"><b>Notes:</b> {quote.notes}</p>}
+                      <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 sm:grid-cols-2">
+                        <span><b>Advance notice:</b> {quote.minimum_notice_hours === null ? 'Not supplied' : `${quote.minimum_notice_hours} hours`}</span>
+                        <span><b>Same-day turnover:</b> {quote.same_day_turnover === null ? 'Not supplied' : quote.same_day_turnover ? 'Yes' : 'No'}</span>
+                        <span><b>Experience:</b> {quote.years_experience === null ? 'Not supplied' : `${quote.years_experience} years`}</span>
+                        <span><b>Insurance:</b> {quote.has_insurance === null ? 'Not supplied' : quote.has_insurance ? 'Yes' : 'No'}</span>
+                        <span><b>Laundry location:</b> {quote.laundry_method || 'Not supplied'}</span>
+                        <span><b>Completion photos:</b> {quote.completion_photos_agreed === null ? 'Not supplied' : quote.completion_photos_agreed ? 'Agreed' : 'Not agreed'}</span>
+                        {quote.equipment_details && <p className="sm:col-span-2"><b>Equipment:</b> {quote.equipment_details}</p>}
+                        {quote.laundry_process && <p className="sm:col-span-2"><b>After-checkout laundry and before-check-in prep:</b> {quote.laundry_process}</p>}
+                      </div>
                       {!awarded && <button disabled={saving} onClick={() => void awardQuote(quote)} className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-black text-white disabled:opacity-50">Select this cleaner</button>}
                     </div>
                   )
