@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { OperationalState } from '@/components/ui/OperationalState'
 import { supabase } from '@/lib/supabase'
+import { getAutomationMode } from '@/lib/autonomy-policy'
 
 type Automation = {
   id: number
@@ -134,6 +135,20 @@ export default function AutomationsPage() {
       failedRuns: scopedMetrics.reduce((sum, metric) => sum + numberValue(metric.failure_count), 0),
       minutesSaved: scopedMetrics.reduce((sum, metric) => sum + numberValue(metric.minutes_saved), 0),
       manualActionsRemoved: scopedMetrics.reduce((sum, metric) => sum + numberValue(metric.manual_actions_removed), 0),
+      autoMode: filtered.filter(row => getAutomationMode({
+        status: row.status,
+        syncStatus: row.sync_status,
+        sourceEnabled: row.source_enabled,
+        riskLevel: row.risk_level,
+        humanApproval: row.human_approval,
+      }) === 'AUTO').length,
+      approvalMode: filtered.filter(row => getAutomationMode({
+        status: row.status,
+        syncStatus: row.sync_status,
+        sourceEnabled: row.source_enabled,
+        riskLevel: row.risk_level,
+        humanApproval: row.human_approval,
+      }) === 'APPROVAL').length,
     }
   }, [filtered, effectiveness])
 
@@ -172,7 +187,7 @@ export default function AutomationsPage() {
           <p className="text-xs font-bold tracking-[0.18em] text-slate-500">ZERO-MANUAL-WORK CONTROL PLANE</p>
           <h1 className="text-3xl font-black mt-1">Automation OS</h1>
           <p className="text-slate-500 mt-2">
-            Estado da fonte, evidência de runs, falhas e economia medida. ACTIVE sem fonte verificada é tratado como drift.
+            AUTO é o padrão para trabalho reversível e de baixo risco. Estado da fonte, evidência de runs, falhas e economia medida continuam obrigatórios.
           </p>
         </div>
         <select
@@ -195,6 +210,8 @@ export default function AutomationsPage() {
       ) : (
         <>
           <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <Metric label="AUTO" value={summary.autoMode} />
+            <Metric label="Approval" value={summary.approvalMode} />
             <Metric label="Ativas verificadas" value={summary.activeVerified} />
             <Metric label="Pausadas" value={summary.paused} />
             <Metric label="Precisam revisão" value={summary.needsReview} tone={summary.needsReview ? 'warning' : 'normal'} />
@@ -240,6 +257,13 @@ export default function AutomationsPage() {
               const failureCount = numberValue(metric?.failure_count)
               const measuredMinutes = numberValue(metric?.minutes_saved)
               const measuredActions = numberValue(metric?.manual_actions_removed)
+              const autonomyMode = getAutomationMode({
+                status: automation.status,
+                syncStatus: automation.sync_status,
+                sourceEnabled: automation.source_enabled,
+                riskLevel: automation.risk_level,
+                humanApproval: automation.human_approval,
+              })
 
               return (
                 <Card key={automation.id} className="p-5">
@@ -248,6 +272,7 @@ export default function AutomationsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-bold text-lg">{automation.name}</p>
                         <StatusBadge status={automation.status} />
+                        <ModeBadge mode={autonomyMode} />
                         <SyncBadge status={automation.sync_status} />
                         <span className="text-xs bg-slate-100 rounded-full px-2.5 py-1">{automation.priority}</span>
                       </div>
@@ -340,6 +365,18 @@ function StatusBadge({ status }: { status: string }) {
         : 'bg-amber-50 text-amber-700'
 
   return <span className={`text-xs rounded-full px-2.5 py-1 ${tone}`}>{status}</span>
+}
+
+function ModeBadge({ mode }: { mode: 'AUTO' | 'APPROVAL' | 'ADVISE' | 'BLOCKED' }) {
+  const tone = mode === 'AUTO'
+    ? 'bg-emerald-50 text-emerald-700'
+    : mode === 'APPROVAL'
+      ? 'bg-amber-50 text-amber-700'
+      : mode === 'BLOCKED'
+        ? 'bg-red-50 text-red-700'
+        : 'bg-blue-50 text-blue-700'
+
+  return <span className={`text-xs rounded-full px-2.5 py-1 font-semibold ${tone}`}>{mode}</span>
 }
 
 function SyncBadge({ status }: { status: string }) {
