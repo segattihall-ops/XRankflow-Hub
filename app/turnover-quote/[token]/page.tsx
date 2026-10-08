@@ -215,7 +215,10 @@ export default function PublicTurnoverQuotePage() {
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
       'sb_publishable_XbmJA9m7lSEywUBMbsQdSw_gsna1jqq'
 
+    // isSingleton: false keeps this client separate from the app-wide one, which
+    // would otherwise be reused without the quote token header.
     return createBrowserClient(url, key, {
+      isSingleton: false,
       global: { headers: { 'x-turnover-token': token } },
     })
   }, [token])
