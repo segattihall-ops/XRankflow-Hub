@@ -403,6 +403,10 @@ export default function PublicTurnoverQuotePage() {
       return
     }
 
+    if (!answersComplete) {
+      setErrorKey('missingAnswers')
+      return
+    }
     setSending(true)
     const { error } = await publicSupabase
       .from('cleaning_turnover_quotes')
@@ -418,6 +422,15 @@ export default function PublicTurnoverQuotePage() {
         includes_laundry: allCostsConfirmed,
         includes_paper_towels: allCostsConfirmed,
         includes_toilet_paper: allCostsConfirmed,
+        confirmed_inclusions: allCostsConfirmed ? (request.extra_inclusions || []) : [],
+        minimum_notice_hours: noticeHours === '' ? null : Number(noticeHours),
+        same_day_turnover: sameDay === 'yes',
+        equipment_details: equipment.trim(),
+        laundry_method: laundryMethod,
+        laundry_process: laundryProcess.trim(),
+        years_experience: experience === '' ? null : Number(experience),
+        has_insurance: insured === '' ? null : insured === 'yes',
+        completion_photos_agreed: completionPhotos,
         estimated_hours: form.estimated_hours ? Number(form.estimated_hours) : null,
         team_size: form.team_size ? Number(form.team_size) : null,
         availability_notes: form.availability_notes.trim() || null,
@@ -680,9 +693,64 @@ export default function PublicTurnoverQuotePage() {
                       <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-emerald-600" checked={allCostsConfirmed} onChange={e => setAllCostsConfirmed(e.target.checked)}/>
                       <span className="space-y-2">
                         <span className="block font-black">{t.confirm}</span>
-                        <span className="block leading-6 text-slate-600">{[t.materials,t.laundry,t.paperTowels,t.toiletPaper].join(' · ')}</span>
+                        <span className="block leading-6 text-slate-600">{[t.materials,t.laundry,t.paperTowels,t.toiletPaper,...(request.extra_inclusions || [])].join(' · ')}</span>
                       </span>
                     </label>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                    <h3 className="mb-4 font-black text-slate-900">{t.screeningTitle}</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className={label}>{t.noticeQuestion} *</label>
+                        <select className={field} required value={noticeHours} onChange={e => setNoticeHours(e.target.value)}>
+                          <option value="">{t.selectAnswer}</option>
+                          {[0,4,12,24,48,72,168].map(h => <option key={h} value={String(h)}>{h === 0 ? 'Same day / Hoje / Hoy' : `${h}h`}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={label}>{t.sameDayQuestion} *</label>
+                        <select className={field} required value={sameDay} onChange={e => setSameDay(e.target.value)}>
+                          <option value="">{t.selectAnswer}</option>
+                          <option value="yes">{t.yesAnswer}</option>
+                          <option value="no">{t.noAnswer}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={label}>{t.equipmentQuestion} *</label>
+                        <textarea className={field} required minLength={3} maxLength={2000} rows={2} value={equipment} onChange={e => setEquipment(e.target.value)} placeholder={t.equipmentHint}/>
+                      </div>
+                      <div>
+                        <label className={label}>{t.laundryQuestion} *</label>
+                        <select className={field} required value={laundryMethod} onChange={e => setLaundryMethod(e.target.value)}>
+                          <option value="">{t.selectAnswer}</option>
+                          {(['on_site','off_site','both'] as const).map((method,i) => <option key={method} value={method}>{t.laundryPlaces[i]}</option>)}
+                        </select>
+                      </div>
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold leading-6 text-amber-950">{t.laundryPolicy}</div>
+                      <div>
+                        <label className={label}>{t.laundryProcessQuestion} *</label>
+                        <textarea className={field} required minLength={10} maxLength={3000} rows={3} value={laundryProcess} onChange={e => setLaundryProcess(e.target.value)} placeholder={t.laundryHint}/>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={label}>{t.experienceQuestion}</label>
+                          <input className={field} type="number" min="0" max="70" step="1" value={experience} onChange={e => setExperience(e.target.value)}/>
+                        </div>
+                        <div>
+                          <label className={label}>{t.insuranceQuestion}</label>
+                          <select className={field} value={insured} onChange={e => setInsured(e.target.value)}>
+                            <option value="">{t.selectAnswer}</option>
+                            <option value="yes">{t.yesAnswer}</option>
+                            <option value="no">{t.noAnswer}</option>
+                          </select>
+                        </div>
+                      </div>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold">
+                        <input type="checkbox" checked={completionPhotos} onChange={e => setCompletionPhotos(e.target.checked)} className="mt-1 h-4 w-4 accent-emerald-600"/>
+                        <span>{t.completionPhotosQuestion} *</span>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -700,6 +768,7 @@ export default function PublicTurnoverQuotePage() {
                   </button>
 
                   {!allIncluded && <p className="text-center text-xs leading-5 text-slate-400">{t.confirmHelp}</p>}
+                  {allIncluded && !answersComplete && <p className="text-center text-xs leading-5 text-amber-700">{t.missingAnswers}</p>}
                   <div className="flex items-start gap-2 rounded-2xl bg-slate-50 p-4 text-xs leading-5 text-slate-500">
                     <ShieldCheck size={16} className="mt-0.5 shrink-0 text-slate-700"/>
                     <span>{t.privacy}</span>
@@ -757,12 +826,3 @@ function SuccessItem({ icon, text }: { icon: React.ReactNode; text: string }) {
   )
 }
 
-function CheckBox({ checked, onChange, label }: { checked: boolean; onChange: (value:boolean) => void; label: string }) {
-  return (
-    <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 text-sm font-bold transition ${checked ? 'border-emerald-300 bg-emerald-50 text-emerald-950' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}>
-      <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={checked} onChange={e => onChange(e.target.checked)}/>
-      <span className="flex-1">{label}</span>
-      {checked && <Check size={16} className="text-emerald-600"/>}
-    </label>
-  )
-}
