@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:tasks": "node --test tests/task-network-recovery.test.mjs",
+    "test:ai": "node --test tests/ai-read-recovery.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

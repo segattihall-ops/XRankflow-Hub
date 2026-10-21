@@ -13,10 +13,14 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const isLoginPage = pathname === '/login'
+  const isPublicQuotePage = pathname.startsWith('/turnover-quote/')
+  const isUnprotectedPage = isLoginPage || isPublicQuotePage
 
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) router.replace('/login')
-  }, [isLoginPage, loading, router, user])
+    if (!loading && !user && !isUnprotectedPage) router.replace('/login')
+  }, [isUnprotectedPage, loading, router, user])
+
+  if (isPublicQuotePage) return children
 
   if (loading) {
     if (isLoginPage) return children

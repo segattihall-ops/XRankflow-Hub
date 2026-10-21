@@ -35,13 +35,106 @@ type Account = {
   handle: string
   status: string
   paused: boolean
+  provider?: string | null
+  provider_channel_id?: string | null
+  buffer_channel_id?: string | null
 }
 
 type Fact = {
   id: string
   brand_id: string
+  category: string
   fact_text: string
   status: string
+  source_name?: string | null
+  source_url?: string | null
+  approved_at?: string | null
+}
+
+type Asset = {
+  id: string
+  brand_id: string
+  kind: string
+  name: string
+  url: string
+  approved: boolean
+  metadata: Record<string, unknown>
+}
+
+type QueueItem = {
+  id: string
+  content_id: string
+  brand_id: string
+  account_id: string
+  status: string
+  due_at: string
+  attempts: number
+  max_attempts: number
+  external_post_id?: string | null
+  external_url?: string | null
+  last_error?: string | null
+}
+
+type ProviderConnection = {
+  id: string
+  brand_id: string
+  provider: string
+  label: string
+  organization_id?: string | null
+  external_account_id?: string | null
+  status: 'needs_key' | 'configured' | 'verified' | 'error' | 'disabled'
+  last_verified_at?: string | null
+  last_error?: string | null
+  meta: Record<string, unknown>
+}
+
+type SupabaseWorkerStatus = {
+  cron_secret?: boolean
+  publisher_cron?: boolean
+  metrics_cron?: boolean
+  connections_total?: number
+  connections_verified?: number
+  connections_needing_key?: number
+  connections_error?: number
+}
+
+type MetricRow = {
+  id: number
+  queue_id: string
+  content_id: string
+  brand_id: string
+  metric_type: string
+  metric_name?: string | null
+  value: number
+  unit?: string | null
+  collected_on: string
+  source?: string | null
+  metrics_updated_at?: string | null
+}
+
+type MetricSync = {
+  queue_id: string
+  content_id: string
+  brand_id: string
+  provider: string
+  status: 'pending' | 'observed' | 'no_data' | 'error'
+  metrics_updated_at?: string | null
+  last_synced_at: string
+  last_error?: string | null
+}
+
+type CreativeRender = {
+  id: string
+  brand_id: string
+  content_id: string
+  template_id: string
+  provider: string
+  status: string
+  external_design_id?: string | null
+  edit_url?: string | null
+  view_url?: string | null
+  error_message?: string | null
+  created_at: string
 }
 
 const statusLabel: Record<string, string> = {
@@ -65,6 +158,13 @@ export default function SocialMediaOSPage() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [facts, setFacts] = useState<Fact[]>([])
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [renders, setRenders] = useState<CreativeRender[]>([])
+  const [queue, setQueue] = useState<QueueItem[]>([])
+  const [metrics, setMetrics] = useState<MetricRow[]>([])
+  const [metricSyncs, setMetricSyncs] = useState<MetricSync[]>([])
+  const [connections, setConnections] = useState<ProviderConnection[]>([])
+  const [workerStatus, setWorkerStatus] = useState<SupabaseWorkerStatus | null>(null)
   const [templates, setTemplates] = useState<SocialTemplate[]>([])
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -80,15 +180,21 @@ export default function SocialMediaOSPage() {
   const loadAll = useCallback(async () => {
     setLoading(true)
     setError('')
-    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, templatesRes] = await Promise.all([
+    const [brandsRes, campaignsRes, contentRes, accountsRes, factsRes, assetsRes, rendersRes, queueRes, metricsRes, metricSyncsRes, connectionsRes, templatesRes] = await Promise.all([
       supabase.from('sm_brands').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_campaigns').select('*').order('created_at', { ascending: false }),
       supabase.from('sm_content').select('*').order('created_at', { ascending: false }).limit(250),
       supabase.from('sm_accounts').select('*').order('created_at', { ascending: false }),
-      supabase.from('sm_brand_facts').select('id,brand_id,fact_text,status').order('created_at', { ascending: false }),
+      supabase.from('sm_brand_facts').select('*').order('created_at', { ascending: false }),
+      supabase.from('sm_brand_assets').select('*').order('created_at', { ascending: false }),
+      supabase.from('sm_template_renders').select('*').order('created_at', { ascending: false }).limit(250),
+      supabase.from('sm_queue').select('*').order('created_at', { ascending: false }).limit(250),
+      supabase.from('sm_metrics').select('*').order('collected_at', { ascending: false }).limit(500),
+      supabase.from('sm_metric_syncs').select('*').order('last_synced_at', { ascending: false }).limit(250),
+      supabase.from('sm_provider_connections').select('*').order('created_at', { ascending: true }),
       supabase.from('sm_templates').select('*').order('priority', { ascending: true }),
     ])
-    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || templatesRes.error
+    const firstError = brandsRes.error || campaignsRes.error || contentRes.error || accountsRes.error || factsRes.error || assetsRes.error || rendersRes.error || queueRes.error || metricsRes.error || metricSyncsRes.error || connectionsRes.error || templatesRes.error
     if (firstError) {
       setError(firstError.message)
       setLoading(false)
@@ -100,6 +206,12 @@ export default function SocialMediaOSPage() {
     setContent((contentRes.data ?? []) as ContentItem[])
     setAccounts((accountsRes.data ?? []) as Account[])
     setFacts((factsRes.data ?? []) as Fact[])
+    setAssets((assetsRes.data ?? []) as Asset[])
+    setRenders((rendersRes.data ?? []) as CreativeRender[])
+    setQueue((queueRes.data ?? []) as QueueItem[])
+    setMetrics((metricsRes.data ?? []) as MetricRow[])
+    setMetricSyncs((metricSyncsRes.data ?? []) as MetricSync[])
+    setConnections((connectionsRes.data ?? []) as ProviderConnection[])
     setTemplates((templatesRes.data ?? []) as SocialTemplate[])
     setSelectedBrandId((current) => current || nextBrands[0]?.id || '')
     setLoading(false)
@@ -108,6 +220,21 @@ export default function SocialMediaOSPage() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  const loadWorkerStatus = useCallback(async () => {
+    const { data, error: statusError } = await supabase.rpc('sm_worker_status')
+    if (statusError) {
+      setWorkerStatus(null)
+      return
+    }
+    setWorkerStatus((data ?? {}) as SupabaseWorkerStatus)
+  }, [])
+
+  useEffect(() => {
+    void loadWorkerStatus()
+  }, [loadWorkerStatus])
+
+
 
   const filteredContent = useMemo(
     () => content.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
@@ -125,6 +252,52 @@ export default function SocialMediaOSPage() {
     () => templates.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
     [templates, selectedBrandId],
   )
+  const filteredFacts = useMemo(
+    () => facts.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [facts, selectedBrandId],
+  )
+  const filteredAssets = useMemo(
+    () => assets.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [assets, selectedBrandId],
+  )
+  const filteredRenders = useMemo(
+    () => renders.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [renders, selectedBrandId],
+  )
+  const filteredQueue = useMemo(
+    () => queue.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [queue, selectedBrandId],
+  )
+  const filteredMetrics = useMemo(
+    () => metrics.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [metrics, selectedBrandId],
+  )
+  const filteredMetricSyncs = useMemo(
+    () => metricSyncs.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [metricSyncs, selectedBrandId],
+  )
+  const filteredConnections = useMemo(
+    () => connections.filter((item) => !selectedBrandId || item.brand_id === selectedBrandId),
+    [connections, selectedBrandId],
+  )
+  const performanceSummary = useMemo(() => {
+    const latestByMetric = new Map<string, MetricRow>()
+    for (const metric of filteredMetrics) {
+      const key = `${metric.content_id}:${metric.metric_type}`
+      const current = latestByMetric.get(key)
+      if (!current || metric.collected_on > current.collected_on) latestByMetric.set(key, metric)
+    }
+
+    const totals = new Map<string, number>()
+    for (const metric of latestByMetric.values()) {
+      totals.set(metric.metric_type, (totals.get(metric.metric_type) || 0) + Number(metric.value || 0))
+    }
+
+    return Array.from(totals.entries())
+      .map(([type, value]) => ({ type, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8)
+  }, [filteredMetrics])
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
     [templates],
@@ -278,6 +451,156 @@ export default function SocialMediaOSPage() {
     }
   }
 
+  async function createFact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedBrandId) return
+    const form = new FormData(event.currentTarget)
+    const factText = String(form.get('fact_text') || '').trim()
+    const category = String(form.get('fact_category') || 'geral').trim()
+    const sourceName = String(form.get('fact_source_name') || '').trim()
+    const sourceUrl = String(form.get('fact_source_url') || '').trim()
+    if (!factText) return
+
+    const { data: userData } = await supabase.auth.getUser()
+    setBusy(true)
+    const { error: insertError } = await supabase.from('sm_brand_facts').insert({
+      brand_id: selectedBrandId,
+      category: category || 'geral',
+      fact_text: factText,
+      status: 'draft',
+      source_name: sourceName || null,
+      source_url: sourceUrl || null,
+      created_by: userData.user?.email || 'authenticated-user',
+    })
+    setBusy(false)
+    if (insertError) setError(insertError.message)
+    else {
+      setNotice('Fato adicionado como rascunho.')
+      event.currentTarget.reset()
+      await loadAll()
+    }
+  }
+
+  async function approveFact(fact: Fact) {
+    const { data: userData } = await supabase.auth.getUser()
+    setBusy(true)
+    const { error: updateError } = await supabase
+      .from('sm_brand_facts')
+      .update({
+        status: 'approved',
+        verified_at: new Date().toISOString(),
+        approved_at: new Date().toISOString(),
+        approved_by: userData.user?.email || 'authenticated-user',
+      })
+      .eq('id', fact.id)
+    setBusy(false)
+    if (updateError) setError(updateError.message)
+    else {
+      setNotice('Fato aprovado e liberado para geração.')
+      await loadAll()
+    }
+  }
+
+  async function createAsset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedBrandId) return
+    const form = new FormData(event.currentTarget)
+    const name = String(form.get('asset_name') || '').trim()
+    const url = String(form.get('asset_url') || '').trim()
+    const kind = String(form.get('asset_kind') || 'image').trim()
+    if (!name || !url) return
+
+    setBusy(true)
+    const { error: insertError } = await supabase.from('sm_brand_assets').insert({
+      brand_id: selectedBrandId,
+      kind,
+      name,
+      url,
+      approved: false,
+      metadata: {},
+    })
+    setBusy(false)
+    if (insertError) setError(insertError.message)
+    else {
+      setNotice('Asset adicionado à biblioteca.')
+      event.currentTarget.reset()
+      await loadAll()
+    }
+  }
+
+  async function toggleAssetApproval(asset: Asset) {
+    setBusy(true)
+    const { error: updateError } = await supabase
+      .from('sm_brand_assets')
+      .update({ approved: !asset.approved })
+      .eq('id', asset.id)
+    setBusy(false)
+    if (updateError) setError(updateError.message)
+    else {
+      setNotice(asset.approved ? 'Asset removido da lista aprovada.' : 'Asset aprovado para uso.')
+      await loadAll()
+    }
+  }
+
+  async function completeRender(render: CreativeRender) {
+    const editUrl = window.prompt('URL de edição da cópia no Canva')
+    if (!editUrl) return
+    const viewUrl = window.prompt('URL pública/visualização (opcional)') || null
+    const mediaInput = window.prompt(
+      'URLs públicas HTTPS dos arquivos finais, separadas por vírgula (opcional). Use JPG/PNG/WebP para imagem e MP4/MOV/WebM para vídeo.',
+    ) || ''
+    const creativeAssets = mediaInput
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((url) => ({
+        type: /\.(mp4|mov|webm)(\?|#|$)/i.test(url) ? 'video' : 'image',
+        url,
+      }))
+
+    if (creativeAssets.some((asset) => !asset.url.startsWith('https://'))) {
+      setError('Todos os arquivos de mídia precisam usar URL pública HTTPS.')
+      return
+    }
+
+    setBusy(true)
+    const { error: renderError } = await supabase
+      .from('sm_template_renders')
+      .update({
+        status: 'ready',
+        edit_url: editUrl,
+        view_url: viewUrl,
+        error_message: null,
+        payload: {
+          creative_assets: creativeAssets,
+          completed_at: new Date().toISOString(),
+        },
+      })
+      .eq('id', render.id)
+    const { error: contentError } = await supabase
+      .from('sm_content')
+      .update({
+        production_status: 'creative_ready',
+        template_status: 'ready',
+        creative_provider: render.provider,
+        creative_edit_url: editUrl,
+        creative_view_url: viewUrl,
+        creative_assets: creativeAssets,
+      })
+      .eq('id', render.content_id)
+    setBusy(false)
+    if (renderError) setError(renderError.message)
+    else if (contentError) setError(contentError.message)
+    else {
+      setNotice(
+        creativeAssets.length
+          ? `Arte pronta com ${creativeAssets.length} arquivo(s) público(s) vinculados.`
+          : 'Arte marcada como pronta. Nenhum arquivo público de mídia foi informado.',
+      )
+      await loadAll()
+    }
+  }
+
   async function registerTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selectedBrandId) return
@@ -392,6 +715,123 @@ export default function SocialMediaOSPage() {
     else {
       setNotice(`Status atualizado para ${statusLabel[status] || status}.`)
       await loadAll()
+    }
+  }
+
+  async function enqueueItem(item: ContentItem) {
+    const compatible = filteredAccounts.filter(
+      (account) => account.platform === item.platform && account.status === 'conectada' && !account.paused,
+    )
+    if (!compatible.length) {
+      setError('Nenhuma conta conectada para esta plataforma. Conecte/mapeie a conta antes de enviar para publicação.')
+      return
+    }
+    const account = compatible.length === 1
+      ? compatible[0]
+      : compatible.find((candidate) => window.confirm(`Usar @${candidate.handle} (${candidate.provider || 'buffer'})?`))
+    if (!account) return
+
+    setBusy(true)
+    const { data, error: rpcError } = await supabase.rpc('sm_enqueue_content', {
+      p_content_id: item.id,
+      p_account_id: account.id,
+      p_due_at: item.scheduled_for || new Date().toISOString(),
+    })
+    setBusy(false)
+    if (rpcError) setError(rpcError.message)
+    else {
+      setNotice(`Publicação adicionada à fila com segurança: ${String(data).slice(0, 8)}…`)
+      await loadAll()
+    }
+  }
+
+  async function configureBufferConnection(connection: ProviderConnection) {
+    const apiKey = window.prompt(
+      `Cole a API key do Buffer para "${connection.label}". Ela será enviada diretamente ao Supabase Vault e não ficará salva no navegador.`,
+    )
+    if (!apiKey?.trim()) return
+
+    setBusy(true)
+    setError('')
+    try {
+      const { data: connectionId, error: saveError } = await supabase.rpc('sm_upsert_buffer_connection', {
+        p_brand: connection.brand_id,
+        p_label: connection.label,
+        p_organization_id: connection.organization_id || '',
+        p_api_key: apiKey.trim(),
+      })
+      if (saveError) throw saveError
+
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'verify_connection', connectionId },
+      })
+      if (verifyError) throw verifyError
+      if (verifyData?.ok === false || verifyData?.error) {
+        throw new Error(verifyData?.error || 'Falha ao verificar conexão Buffer')
+      }
+
+      setNotice(`Buffer verificado: ${verifyData?.account?.email || connection.label}. Canais sincronizados automaticamente.`)
+      await Promise.all([loadAll(), loadWorkerStatus()])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao configurar Buffer')
+      await Promise.all([loadAll(), loadWorkerStatus()])
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyBufferConnection(connection: ProviderConnection) {
+    setBusy(true)
+    setError('')
+    try {
+      const { data, error: verifyError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'verify_connection', connectionId: connection.id },
+      })
+      if (verifyError) throw verifyError
+      if (data?.ok === false || data?.error) throw new Error(data?.error || 'Falha ao verificar Buffer')
+      setNotice(`Conexão verificada e ${data?.channels?.length || 0} canal(is) sincronizado(s).`)
+      await Promise.all([loadAll(), loadWorkerStatus()])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao verificar Buffer')
+      await Promise.all([loadAll(), loadWorkerStatus()])
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function runPublisherNow() {
+    setBusy(true)
+    setError('')
+    try {
+      const { data, error: runError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'run' },
+      })
+      if (runError) throw runError
+      if (data?.ok === false || data?.error) throw new Error(data?.error || 'Falha no publicador')
+      setNotice(`Worker executado: ${data?.claimed ?? 0} item(ns) processado(s).`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao executar worker')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function runMetricsNow() {
+    setBusy(true)
+    setError('')
+    try {
+      const { data, error: runError } = await supabase.functions.invoke('sm-publisher', {
+        body: { mode: 'metrics' },
+      })
+      if (runError) throw runError
+      if (data?.ok === false || data?.error) throw new Error(data?.error || 'Falha na sincronização de métricas')
+      setNotice(`Métricas sincronizadas: ${data?.observed ?? 0} observadas; ${data?.pending ?? 0} pendentes.`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao sincronizar métricas')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -557,6 +997,86 @@ export default function SocialMediaOSPage() {
           </section>
         </div>
 
+        <div className="grid gap-6 xl:grid-cols-2">
+          <section className={panel}>
+            <h2 className="text-lg font-bold">Brand Knowledge</h2>
+            <p className="mt-1 text-xs text-gray-500">Somente fatos aprovados entram como verdade comercial na geração.</p>
+            <form onSubmit={createFact} className="mt-4 space-y-3">
+              <textarea className={input} name="fact_text" placeholder="Fato confirmado sobre a marca" rows={3} required />
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className={input} name="fact_category" placeholder="Categoria (preço, produto, política...)" />
+                <input className={input} name="fact_source_name" placeholder="Fonte" />
+              </div>
+              <input className={input} name="fact_source_url" placeholder="URL da fonte (opcional)" />
+              <button disabled={busy || !selectedBrand} className="w-full rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                Adicionar fato
+              </button>
+            </form>
+            <div className="mt-4 space-y-2">
+              {filteredFacts.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhum fato cadastrado.</div>
+              ) : filteredFacts.slice(0, 10).map((fact) => (
+                <div key={fact.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{fact.fact_text}</p>
+                      <p className="mt-1 text-xs text-gray-500">{fact.category} · {fact.status}</p>
+                    </div>
+                    {fact.status !== 'approved' && (
+                      <button onClick={() => void approveFact(fact)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+                        Aprovar
+                      </button>
+                    )}
+                  </div>
+                  {fact.source_url && (
+                    <a href={fact.source_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline">
+                      Ver fonte <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={panel}>
+            <h2 className="text-lg font-bold">Brand Assets</h2>
+            <p className="mt-1 text-xs text-gray-500">Logos, imagens, vídeos, templates e referências aprovadas por marca.</p>
+            <form onSubmit={createAsset} className="mt-4 space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className={input} name="asset_name" placeholder="Nome do asset" required />
+                <select className={input} name="asset_kind" defaultValue="image">
+                  <option value="logo">Logo</option>
+                  <option value="image">Imagem</option>
+                  <option value="video">Vídeo</option>
+                  <option value="template">Template</option>
+                  <option value="font">Fonte</option>
+                  <option value="reference">Referência</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+              <input className={input} name="asset_url" placeholder="URL do arquivo" required />
+              <button disabled={busy || !selectedBrand} className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                Adicionar asset
+              </button>
+            </form>
+            <div className="mt-4 space-y-2">
+              {filteredAssets.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhum asset cadastrado.</div>
+              ) : filteredAssets.slice(0, 10).map((asset) => (
+                <div key={asset.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="min-w-0">
+                    <a href={asset.url} target="_blank" rel="noreferrer" className="truncate text-sm font-semibold text-blue-700 hover:underline">{asset.name}</a>
+                    <p className="text-xs text-gray-500">{asset.kind} · {asset.approved ? 'aprovado' : 'pendente'}</p>
+                  </div>
+                  <button onClick={() => void toggleAssetApproval(asset)} className="rounded-lg border px-3 py-2 text-xs font-semibold">
+                    {asset.approved ? 'Desaprovar' : 'Aprovar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
         <section className={panel}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
@@ -637,6 +1157,180 @@ export default function SocialMediaOSPage() {
         </section>
 
         <section className={panel}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Contas e fila de publicação</h2>
+              <p className="mt-1 text-xs text-gray-500">Provider-agnostic, com idempotência, tentativas e confirmação externa.</p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{filteredQueue.length} jobs</span>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-semibold">Conexões Buffer desta marca</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  As chaves ficam criptografadas no Supabase Vault. O navegador nunca recupera o valor salvo.
+                </p>
+              </div>
+              <button
+                onClick={() => void runPublisherNow()}
+                disabled={busy || !filteredConnections.some((item) => item.status === 'verified')}
+                className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
+              >
+                Processar fila agora
+              </button>
+            </div>
+
+            {filteredConnections.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">
+                Nenhuma conexão Buffer cadastrada para esta marca.
+              </div>
+            ) : filteredConnections.map((connection) => (
+              <div key={connection.id} className="rounded-xl border bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">{connection.label}</p>
+                      <span className={
+                        connection.status === 'verified'
+                          ? 'rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700'
+                          : connection.status === 'error'
+                            ? 'rounded-full bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700'
+                            : 'rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700'
+                      }>
+                        {connection.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Organização: {connection.organization_id || 'será detectada automaticamente'}
+                    </p>
+                    {connection.last_verified_at && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Verificada {new Date(connection.last_verified_at).toLocaleString()}
+                      </p>
+                    )}
+                    {connection.last_error && <p className="mt-2 text-xs text-red-600">{connection.last_error}</p>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => void configureBufferConnection(connection)}
+                      disabled={busy}
+                      className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {connection.status === 'needs_key' ? 'Adicionar API key' : 'Substituir API key'}
+                    </button>
+                    {connection.status !== 'needs_key' && (
+                      <button
+                        onClick={() => void verifyBufferConnection(connection)}
+                        disabled={busy}
+                        className="rounded-lg border bg-white px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      >
+                        Verificar + sincronizar canais
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Contas da marca</p>
+              {filteredAccounts.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Nenhuma conta social mapeada.</div>
+              ) : filteredAccounts.map((account) => (
+                <div key={account.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div><b>{account.platform}</b> · @{account.handle}</div>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px]">{account.status}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Provider: {account.provider || 'buffer'} · {account.provider_channel_id || account.buffer_channel_id || 'canal não mapeado'}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Fila</p>
+              {filteredQueue.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500">Fila vazia.</div>
+              ) : filteredQueue.slice(0, 12).map((job) => {
+                const item = content.find((candidate) => candidate.id === job.content_id)
+                return (
+                  <div key={job.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{item?.theme || item?.code || job.content_id}</p>
+                      <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px]">{job.status}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">{new Date(job.due_at).toLocaleString()} · tentativa {job.attempts}/{job.max_attempts}</p>
+                    {job.external_post_id && <p className="mt-1 text-xs text-gray-500">ID externo: {job.external_post_id}</p>}
+                    {job.external_url && <a href={job.external_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600">Ver publicação <ExternalLink size={12}/></a>}
+                    {job.last_error && <p className="mt-2 text-xs text-red-600">{job.last_error}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {['pendente', 'falhou', 'incerto', 'enviado_api'].includes(job.status) && (
+                        <button
+                          onClick={() => void runPublisherNow()}
+                          disabled={busy || !filteredConnections.some((item) => item.status === 'verified')}
+                          className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-40"
+                        >
+                          Processar worker
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        <section className={panel}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Creative Queue</h2>
+              <p className="mt-1 text-xs text-gray-500">Acompanhe artes preparadas e vincule a cópia final do Canva sem tocar no master.</p>
+            </div>
+            <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">{filteredRenders.length} jobs</span>
+          </div>
+          <div className="mt-4 space-y-2">
+            {filteredRenders.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-5 text-sm text-gray-500">Nenhuma arte em preparação.</div>
+            ) : filteredRenders.slice(0, 12).map((render) => {
+              const item = content.find((candidate) => candidate.id === render.content_id)
+              const template = templateById.get(render.template_id)
+              return (
+                <div key={render.id} className="rounded-xl border p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="rounded-full bg-violet-50 px-2 py-1 font-semibold text-violet-700">{render.status}</span>
+                        <span className="text-gray-500">{render.provider}</span>
+                      </div>
+                      <p className="mt-2 font-semibold">{item?.theme || item?.code || render.content_id}</p>
+                      <p className="mt-1 text-xs text-gray-500">{template?.name || 'Template'} · {new Date(render.created_at).toLocaleString()}</p>
+                      {render.error_message && <p className="mt-2 text-xs text-red-600">{render.error_message}</p>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {render.edit_url && (
+                        <a href={render.edit_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold">
+                          Abrir arte <ExternalLink size={13} />
+                        </a>
+                      )}
+                      {render.status !== 'ready' && (
+                        <button onClick={() => void completeRender(render)} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white">
+                          Marcar pronta
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className={panel}>
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-bold">Biblioteca e aprovação</h2>
@@ -671,6 +1365,11 @@ export default function SocialMediaOSPage() {
                       )}
                       <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{item.caption || 'Sem legenda'}</p>
                       {item.scheduled_for && <p className="mt-2 text-xs text-gray-500">Agendado: {new Date(item.scheduled_for).toLocaleString()}</p>}
+                      {Array.isArray(item.creative_assets) && item.creative_assets.length > 0 && (
+                        <p className="mt-2 text-xs font-medium text-emerald-700">
+                          {item.creative_assets.length} mídia(s) pública(s) pronta(s)
+                        </p>
+                      )}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {item.template_id && (
@@ -688,8 +1387,20 @@ export default function SocialMediaOSPage() {
                         </>
                       )}
                       {item.status === 'aprovado' && (
-                        <button onClick={() => void scheduleItem(item)} className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">
+                        <button
+                          onClick={() => void scheduleItem(item)}
+                          className="flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700"
+                        >
                           <CalendarDays size={14} /> Agendar
+                        </button>
+                      )}
+                      {(item.status === 'aprovado' || item.status === 'agendado') && (
+                        <button
+                          onClick={() => void enqueueItem(item)}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                          disabled={busy}
+                        >
+                          Enviar à fila
                         </button>
                       )}
                     </div>
@@ -698,6 +1409,79 @@ export default function SocialMediaOSPage() {
               ))}
             </div>
           )}
+        </section>
+
+        <section className={panel}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-blue-600" />
+                <h2 className="text-lg font-bold">Métricas observadas</h2>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Dados reais do provider. Ausência de dados nunca é tratada como zero.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-gray-500">
+                {filteredMetricSyncs.filter((item) => item.status === 'observed').length} posts com métricas
+              </div>
+              <button
+                onClick={() => void runMetricsNow()}
+                disabled={busy || !filteredConnections.some((item) => item.status === 'verified')}
+                className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+              >
+                Sincronizar agora
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {performanceSummary.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-gray-500 md:col-span-2 xl:col-span-4">
+                Ainda não há métricas observadas para esta marca.
+              </div>
+            ) : performanceSummary.map((metric) => (
+              <div key={metric.type} className="rounded-xl border p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500">{metric.type}</p>
+                <p className="mt-2 text-2xl font-bold">{metric.value.toLocaleString()}</p>
+                <p className="mt-1 text-[11px] text-gray-400">Soma do snapshot mais recente por conteúdo</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-4">
+            {(['observed', 'pending', 'no_data', 'error'] as const).map((status) => (
+              <div key={status} className="rounded-lg bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">{status}</p>
+                <p className="mt-1 text-xl font-bold">{filteredMetricSyncs.filter((item) => item.status === status).length}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 space-y-2">
+            {filteredMetricSyncs.slice(0, 10).map((sync) => {
+              const item = content.find((candidate) => candidate.id === sync.content_id)
+              return (
+                <div key={sync.queue_id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-semibold">{item?.theme || item?.code || sync.content_id}</p>
+                      <p className="text-xs text-gray-500">
+                        {sync.provider} · {sync.status} · última sincronização {new Date(sync.last_synced_at).toLocaleString()}
+                      </p>
+                    </div>
+                    {sync.metrics_updated_at && (
+                      <span className="text-xs text-gray-500">
+                        Provider atualizado {new Date(sync.metrics_updated_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  {sync.last_error && <p className="mt-2 text-xs text-red-600">{sync.last_error}</p>}
+                </div>
+              )
+            })}
+          </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -730,7 +1514,15 @@ export default function SocialMediaOSPage() {
               <div className="flex justify-between"><span>Seleção automática de templates</span><b className="text-emerald-700">Ativa</b></div>
               <div className="flex justify-between"><span>Canva master library</span><b className="text-emerald-700">{filteredTemplates.length ? 'Conectada' : 'Sem templates'}</b></div>
               <div className="flex justify-between"><span>Aprovação e agendamento</span><b className="text-emerald-700">Ativos</b></div>
-              <div className="flex justify-between"><span>Publicação externa</span><b className="text-amber-700">Aguardando integrador conectado</b></div>
+              <div className="flex justify-between"><span>Publicação externa</span><b className={filteredConnections.some((item) => item.status === 'verified') ? 'text-emerald-700' : 'text-amber-700'}>{filteredConnections.some((item) => item.status === 'verified') ? 'Buffer verificado' : 'Aguardando API key desta marca'}</b></div>
+              <div className="flex justify-between gap-4"><span>Worker automático</span><b className={workerStatus?.publisher_cron && workerStatus?.cron_secret ? 'text-emerald-700' : 'text-amber-700'}>{workerStatus?.publisher_cron && workerStatus?.cron_secret ? 'Supabase pg_cron · 5 min' : 'Worker indisponível'}</b></div>
+              <div className="flex justify-between gap-4"><span>Sincronização de métricas</span><b className={workerStatus?.metrics_cron && workerStatus?.cron_secret ? 'text-emerald-700' : 'text-amber-700'}>{workerStatus?.metrics_cron && workerStatus?.cron_secret ? 'Supabase pg_cron · diária' : 'Cron de métricas indisponível'}</b></div>
+              {workerStatus && Number(workerStatus.connections_needing_key || 0) > 0 && (
+                <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                  {workerStatus.connections_needing_key} conexão(ões) Buffer ainda precisam de API key.
+                </div>
+              )}
+              <div className="flex justify-between"><span>Métricas do provider</span><b className={filteredMetricSyncs.some((item) => item.status === 'observed') ? 'text-emerald-700' : 'text-amber-700'}>{filteredMetricSyncs.some((item) => item.status === 'observed') ? 'Dados observados' : 'Aguardando publicação + provider'}</b></div>
               <div className="flex justify-between"><span>Pesquisa externa automática</span><b className="text-amber-700">Aguardando provedor autorizado</b></div>
             </div>
           </section>

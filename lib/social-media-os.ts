@@ -79,6 +79,11 @@ export type ContentItem = {
   creative_design_id?: string | null
   creative_edit_url?: string | null
   creative_view_url?: string | null
+  creative_assets?: Array<{
+    type: 'image' | 'video'
+    url: string
+    thumbnailOffset?: number
+  }>
 }
 
 type PackInput = {
