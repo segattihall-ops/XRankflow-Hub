@@ -38,6 +38,9 @@ jobs:
       - name: Task network recovery tests
         run: npm run test:tasks
 
+      - name: AI read command and recovery tests
+        run: npm run test:ai
+
       - name: Typecheck
         run: npm run type-check
 
