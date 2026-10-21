@@ -15,6 +15,17 @@ type AuditRow = {
 
 const statuses = ['Inbox', 'Next', 'In Progress', 'Waiting', 'Done', 'Parked']
 
+function hasTaskAcknowledgement(result:unknown,status:string,taskId?:string){
+  if(!result||typeof result!=='object'||!('task' in result)) return false
+  const value=result.task
+  const task=Array.isArray(value)?(value.length===1?value[0]:null):value
+  if(!task||typeof task!=='object'||Array.isArray(task)) return false
+  const row=task as Record<string,unknown>
+  return typeof row.id==='string'&&row.id.trim().length>0&&
+    typeof row.title==='string'&&row.title.trim().length>0&&
+    row.status===status&&(taskId===undefined||row.id===taskId)
+}
+
 export default function TasksPage() {
   const [tasks,setTasks]=useState<TaskRecord[]>([])
   const [projects,setProjects]=useState<ProjectRecord[]>([])
@@ -37,20 +48,27 @@ export default function TasksPage() {
   async function load(){
     setLoading(true)
     setError(null)
-    const [tasksRes,projectsRes,auditRes]=await Promise.all([
-      supabase.from('wh_tasks').select('*').order('created_at',{ascending:false}),
-      supabase.from('wh_projects').select('*').order('name',{ascending:true}),
-      supabase.from('xrmg_task_audit_log').select('id,action,task_id,occurred_at').order('occurred_at',{ascending:false}).limit(12),
-    ])
-    const first=tasksRes.error||projectsRes.error
-    if(first){
-      setError(first.message)
-    } else {
+    try {
+      const [tasksRes,projectsRes,auditRes]=await Promise.all([
+        supabase.from('wh_tasks').select('*').order('created_at',{ascending:false}),
+        supabase.from('wh_projects').select('*').order('name',{ascending:true}),
+        supabase.from('xrmg_task_audit_log').select('id,action,task_id,occurred_at').order('occurred_at',{ascending:false}).limit(12),
+      ])
+      const first=tasksRes.error||projectsRes.error
+      if(first){
+        setError(first.message)
+        return false
+      }
       setTasks((tasksRes.data||[]) as TaskRecord[])
       setProjects((projectsRes.data||[]) as ProjectRecord[])
       if(!auditRes.error) setAudit((auditRes.data||[]) as AuditRow[])
+      return true
+    } catch {
+      setError('Não foi possível carregar as tarefas. Verifique a conexão e tente novamente.')
+      return false
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(()=>{void load()},[])
@@ -67,34 +85,48 @@ export default function TasksPage() {
     setError(null)
     setNotice(null)
 
-    const response=await fetch('/api/tasks',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        title:title.trim(),
-        priority,
-        status,
-        due_date:dueDate||null,
-        project_id:projectId||null,
-        idempotency_key:createKey.current||crypto.randomUUID(),
-      }),
-    })
-    const result=await response.json().catch(()=>({error:'Resposta inválida do servidor.'}))
+    let confirmed=false
+    try {
+      const response=await fetch('/api/tasks',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          title:title.trim(),
+          priority,
+          status,
+          due_date:dueDate||null,
+          project_id:projectId||null,
+          idempotency_key:createKey.current||crypto.randomUUID(),
+        }),
+      })
+      const result=await response.json().catch(()=>null)
 
-    if(!response.ok){
-      setError(result.error||'Não foi possível criar a tarefa.')
-    } else {
-      setTitle('')
-      setDueDate('')
-      setProjectId('')
-      setPriority('Medium')
-      setStatus('Next')
-      setShowForm(false)
-      createKey.current=''
-      setNotice('Tarefa criada e auditada com sucesso.')
-      await load()
+      if(!response.ok){
+        setError(result?.error||'Não foi possível criar a tarefa.')
+      } else if(!hasTaskAcknowledgement(result,status)){
+        setError('Não foi possível confirmar a operação. Verifique a lista de tarefas antes de tentar novamente.')
+      } else {
+        confirmed=true
+        setTitle('')
+        setDueDate('')
+        setProjectId('')
+        setPriority('Medium')
+        setStatus('Next')
+        setShowForm(false)
+        createKey.current=''
+        setNotice('Tarefa criada e auditada com sucesso.')
+        if(!(await load())) setError('A tarefa foi criada, mas a lista não pôde ser atualizada. Recarregue a página para ver a alteração.')
+      }
+    } catch {
+      if(confirmed){
+        setError('A tarefa foi criada, mas a lista não pôde ser atualizada. Recarregue a página para ver a alteração.')
+      } else {
+        setNotice(null)
+        setError('Não foi possível confirmar a operação. Verifique a conexão e tente novamente.')
+      }
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   async function updateStatus(task:TaskRecord,nextStatus:string){
@@ -103,24 +135,38 @@ export default function TasksPage() {
     setError(null)
     setNotice(null)
 
-    const response=await fetch('/api/tasks',{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        task_id:task.id,
-        status:nextStatus,
-        idempotency_key:crypto.randomUUID(),
-      }),
-    })
-    const result=await response.json().catch(()=>({error:'Resposta inválida do servidor.'}))
+    let confirmed=false
+    try {
+      const response=await fetch('/api/tasks',{
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          task_id:task.id,
+          status:nextStatus,
+          idempotency_key:crypto.randomUUID(),
+        }),
+      })
+      const result=await response.json().catch(()=>null)
 
-    if(!response.ok){
-      setError(result.error||'Não foi possível atualizar a tarefa.')
-    } else {
-      setNotice('Status atualizado e registrado no audit log.')
-      await load()
+      if(!response.ok){
+        setError(result?.error||'Não foi possível atualizar a tarefa.')
+      } else if(!hasTaskAcknowledgement(result,nextStatus,task.id)){
+        setError('Não foi possível confirmar a operação. Verifique a lista de tarefas antes de tentar novamente.')
+      } else {
+        confirmed=true
+        setNotice('Status atualizado e registrado no audit log.')
+        if(!(await load())) setError('O status foi salvo, mas a lista não pôde ser atualizada. Recarregue a página para ver a alteração.')
+      }
+    } catch {
+      if(confirmed){
+        setError('O status foi salvo, mas a lista não pôde ser atualizada. Recarregue a página para ver a alteração.')
+      } else {
+        setNotice(null)
+        setError('Não foi possível confirmar a operação. Verifique a conexão e tente novamente.')
+      }
+    } finally {
+      setUpdatingId(null)
     }
-    setUpdatingId(null)
   }
 
   const filtered=useMemo(()=>tasks.filter(t=>{

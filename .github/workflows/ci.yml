@@ -35,6 +35,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Task network recovery tests
+        run: npm run test:tasks
+
       - name: Typecheck
         run: npm run type-check
 
