@@ -67,34 +67,40 @@ export default function TasksPage() {
     setError(null)
     setNotice(null)
 
-    const response=await fetch('/api/tasks',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        title:title.trim(),
-        priority,
-        status,
-        due_date:dueDate||null,
-        project_id:projectId||null,
-        idempotency_key:createKey.current||crypto.randomUUID(),
-      }),
-    })
-    const result=await response.json().catch(()=>({error:'Resposta inválida do servidor.'}))
+    try {
+      const response=await fetch('/api/tasks',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          title:title.trim(),
+          priority,
+          status,
+          due_date:dueDate||null,
+          project_id:projectId||null,
+          idempotency_key:createKey.current||crypto.randomUUID(),
+        }),
+      })
+      const result=await response.json().catch(()=>({error:'Resposta inválida do servidor.'}))
 
-    if(!response.ok){
-      setError(result.error||'Não foi possível criar a tarefa.')
-    } else {
-      setTitle('')
-      setDueDate('')
-      setProjectId('')
-      setPriority('Medium')
-      setStatus('Next')
-      setShowForm(false)
-      createKey.current=''
-      setNotice('Tarefa criada e auditada com sucesso.')
-      await load()
+      if(!response.ok){
+        setError(result.error||'Não foi possível criar a tarefa.')
+      } else {
+        setTitle('')
+        setDueDate('')
+        setProjectId('')
+        setPriority('Medium')
+        setStatus('Next')
+        setShowForm(false)
+        createKey.current=''
+        setNotice('Tarefa criada e auditada com sucesso.')
+        await load()
+      }
+    } catch {
+      setNotice(null)
+      setError('Não foi possível confirmar a operação. Verifique a conexão e tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   async function updateStatus(task:TaskRecord,nextStatus:string){
@@ -103,24 +109,30 @@ export default function TasksPage() {
     setError(null)
     setNotice(null)
 
-    const response=await fetch('/api/tasks',{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        task_id:task.id,
-        status:nextStatus,
-        idempotency_key:crypto.randomUUID(),
-      }),
-    })
-    const result=await response.json().catch(()=>({error:'Resposta inválida do servidor.'}))
+    try {
+      const response=await fetch('/api/tasks',{
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          task_id:task.id,
+          status:nextStatus,
+          idempotency_key:crypto.randomUUID(),
+        }),
+      })
+      const result=await response.json().catch(()=>({error:'Resposta inválida do servidor.'}))
 
-    if(!response.ok){
-      setError(result.error||'Não foi possível atualizar a tarefa.')
-    } else {
-      setNotice('Status atualizado e registrado no audit log.')
-      await load()
+      if(!response.ok){
+        setError(result.error||'Não foi possível atualizar a tarefa.')
+      } else {
+        setNotice('Status atualizado e registrado no audit log.')
+        await load()
+      }
+    } catch {
+      setNotice(null)
+      setError('Não foi possível confirmar a operação. Verifique a conexão e tente novamente.')
+    } finally {
+      setUpdatingId(null)
     }
-    setUpdatingId(null)
   }
 
   const filtered=useMemo(()=>tasks.filter(t=>{
